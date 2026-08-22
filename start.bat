@@ -16,10 +16,10 @@ if errorlevel 1 (
     echo     缺少后端依赖，正在安装（首次约 1-2 分钟）...
     pip install -r "%BE%\requirements.txt" -i https://pypi.tuna.tsinghua.edu.cn/simple
 )
-python -c "import openai" >nul 2>nul
+python -c "import openai, matplotlib, docx, reportlab" >nul 2>nul
 if errorlevel 1 (
-    echo     缺少 ML/AI 依赖（openai/onnx），正在安装...
-    pip install openai onnx onnxruntime -i https://pypi.tuna.tsinghua.edu.cn/simple
+    echo     缺少 ML/AI 依赖（openai/onnx/report库），正在安装...
+    pip install openai onnx onnxruntime matplotlib python-docx reportlab markdown -i https://pypi.tuna.tsinghua.edu.cn/simple
 )
 
 echo [2/4] 检查前端依赖...

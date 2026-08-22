@@ -6,6 +6,9 @@
   - pdf  ：PDF（reportlab + CID 中文字体）
 
 约定：报告文本不使用任何 emoji，纯文本排版；图表由 matplotlib 绘制（Agg 无头模式）。
+
+说明：matplotlib / python-docx / reportlab 采用**延迟导入**——即使环境缺少
+报告依赖，后端其余功能（仿真/算法/智能体）照常运行，仅报告接口返回缺依赖提示。
 """
 
 import base64
@@ -14,19 +17,23 @@ import os
 import tempfile
 from datetime import datetime
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib import font_manager
-
 # ── 中文字体（Windows） ─────────────────────────────────────
 _CN_FONT = False
+_PLT = None  # matplotlib.pyplot（延迟加载）
 
 
 def _setup_font() -> bool:
-    global _CN_FONT
+    """初始化 matplotlib 中文字体。缺 matplotlib 时返回 False（图表接口将报缺依赖）。"""
+    global _CN_FONT, _PLT
     if _CN_FONT:
         return True
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib import font_manager
+    except ImportError:
+        return False
     for path in (r"C:\Windows\Fonts\simhei.ttf",
                  r"C:\Windows\Fonts\msyh.ttc",
                  r"C:\Windows\Fonts\simsun.ttc"):
@@ -38,13 +45,12 @@ def _setup_font() -> bool:
             plt.rcParams["font.sans-serif"] = [name, "DejaVu Sans"]
             plt.rcParams["axes.unicode_minus"] = False
             _CN_FONT = True
+            _PLT = plt
             return True
         except Exception:  # noqa: BLE001 ttc 集合可能不受支持
             continue
-    return False
-
-
-_CN_FONT = _setup_font()
+    _PLT = plt
+    return True
 
 
 def _fmt_num(v, digits: int = 1) -> str:
@@ -137,6 +143,13 @@ class ReportGenerator:
     # ── 图表（返回 图名 → PNG bytes） ────────────────────────
 
     def charts(self, data: dict) -> dict[str, bytes]:
+        """生成图表。缺 matplotlib 时抛出带安装提示的错误。"""
+        global _PLT
+        if _PLT is None:
+            if not _setup_font():
+                raise RuntimeError("缺少 matplotlib，无法生成图表。"
+                                   "请执行: pip install matplotlib")
+        plt = _PLT
         out: dict[str, bytes] = {}
         hist = data["hist"]
 
@@ -332,8 +345,12 @@ class ReportGenerator:
 
     def render_docx(self, data: dict, charts: dict[str, bytes],
                     sections: list[str]) -> bytes:
-        from docx import Document
-        from docx.shared import Pt, Inches, RGBColor
+        try:
+            from docx import Document
+            from docx.shared import Pt, Inches, RGBColor
+        except ImportError as exc:
+            raise RuntimeError("缺少 python-docx，无法生成 Word 报告。"
+                               "请执行: pip install python-docx") from exc
 
         doc = Document()
         lo, hi = data["range"]["start"], data["range"]["end"]
@@ -469,14 +486,18 @@ class ReportGenerator:
 
     def render_pdf(self, data: dict, charts: dict[str, bytes],
                    sections: list[str]) -> bytes:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import ParagraphStyle
-        from reportlab.lib.units import inch
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-        from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
-                                        Table, TableStyle, Image)
-        from reportlab.lib import colors
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.pdfbase import pdfmetrics
+            from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+            from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                            Table, TableStyle, Image)
+            from reportlab.lib import colors
+        except ImportError as exc:
+            raise RuntimeError("缺少 reportlab，无法生成 PDF 报告。"
+                               "请执行: pip install reportlab") from exc
 
         try:
             pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))

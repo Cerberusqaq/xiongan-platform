@@ -33,7 +33,11 @@ def generate_report(request: Request, body: dict = Body(...)):
     if not sections:
         sections = ALL_SECTIONS
 
-    filename, content = ReportGenerator(runtime).generate(fmt, start, end, sections)
+    try:
+        filename, content = ReportGenerator(runtime).generate(fmt, start, end, sections)
+    except RuntimeError as exc:
+        # 缺 matplotlib / python-docx / reportlab 等依赖时给出安装提示
+        return {"code": 2003, "message": str(exc), "data": None}
     media = {
         "md": "text/markdown; charset=utf-8",
         "docx": "application/vnd.openxmlformats-officedocument."
