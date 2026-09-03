@@ -598,10 +598,61 @@ class AppRuntime:
         }
 
     def vehicle_detail(self, veh_id: str) -> dict:
-        """单辆车实时详情（含路线，点击车辆用）。"""
+        """单辆车实时详情（含路线，点击车辆用）；附带节能/通行驾驶建议。"""
         if self.session is None:
             raise SessionError(1001, "仿真未启动")
-        return self.session.engine.get_vehicle_state(veh_id)
+        st = self.session.engine.get_vehicle_state(veh_id)
+        try:
+            st["advice"] = self.vehicle_advice(veh_id, st)
+        except Exception:  # noqa: BLE001 建议为增强信息，失败不影响详情
+            st["advice"] = None
+        return st
+
+    def vehicle_advice(self, veh_id: str, state: dict | None = None) -> dict:
+        """车端驾驶建议（云/边下行指令的落地）：建议车速 + 前方路况提示。
+
+        规则：按当前边限速与下游 1-2 条边的实时拥堵度给出节能/通行建议车速；
+        属"规则 + 轻预测"的轻量化车端决策原型（无权重时 STGCN 亦按此兜底）。
+        """
+        if self.session is None:
+            raise SessionError(1001, "仿真未启动")
+        from app.core.datacollector import edge_from_lane
+        eng = self.session.engine
+        st = state or eng.get_vehicle_state(veh_id)
+        edge = edge_from_lane(st.get("lane", ""))
+        cur_kmh = round((st.get("speed", 0) or 0) * 3.6, 1)
+        limit = 13.89
+        try:
+            limit = eng.get_edge_speed_limit(edge)
+        except Exception:  # noqa: BLE001
+            pass
+        succ = []
+        try:
+            succ = list(eng.get_edge_successors(edge))[:2]
+        except Exception:  # noqa: BLE001
+            pass
+        # 下游状态：最差一级决定整体状态与建议系数
+        level_score = {"畅通": 0, "缓行": 1, "拥堵": 2}
+        state_label, notes = "畅通", []
+        for e in succ:
+            try:
+                st_e = eng.get_edge_stats(e)
+                occ, ms = st_e.get("occupancy", 0) or 0, st_e.get("mean_speed", 0) or 0
+                lv = "拥堵" if ms < 1.2 else ("缓行" if ms < 4.5 or occ > 0.35 else "畅通")
+            except Exception:  # noqa: BLE001
+                continue
+            notes.append(f"{e}:{lv}")
+            if level_score[lv] > level_score[state_label]:
+                state_label = lv
+        factor = {"畅通": 0.90, "缓行": 0.75, "拥堵": 0.55}[state_label]
+        suggested = round(min(limit, limit * factor) * 3.6, 1)
+        reason = f"当前限速 {round(limit * 3.6, 1)} km/h"
+        if notes:
+            reason += "；下游 " + "、".join(notes)
+        reason += f"，建议按 {factor * 100:.0f}% 限速平稳行驶以节能省停"
+        return {"current_kmh": cur_kmh, "suggested_kmh": suggested,
+                "state": state_label, "reason": reason,
+                "next_edges": succ, "suggested_mps": round(suggested / 3.6, 2)}
 
     def evaluate_score(self, overall: dict | None = None,
                        intersections: list | None = None) -> dict:

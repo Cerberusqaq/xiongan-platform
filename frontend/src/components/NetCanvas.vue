@@ -1241,6 +1241,14 @@ onBeforeUnmount(() => {
         <div class="kv"><span>车道</span><span class="mono">{{ selected.info.lane ?? '—' }}</span></div>
         <div class="kv"><span>累计等待</span><span class="mono">{{ (selected.info.waiting_time ?? 0).toFixed(1) }} s</span></div>
         <div class="kv route"><span>路线</span><span class="mono route-list">{{ (selected.info.route || []).join(' → ') || '—' }}</span></div>
+        <div v-if="selected.info.advice" class="advice-block">
+          <div class="advice-state" :class="selected.info.advice.state">
+            <span class="advice-title">驾驶建议</span>
+            <span class="mono">{{ selected.info.advice.suggested_kmh }} km/h</span>
+            <span class="advice-lv">· {{ selected.info.advice.state }}</span>
+          </div>
+          <div class="advice-reason">{{ selected.info.advice.reason }}</div>
+        </div>
       </template>
       <template v-else-if="selected.type === 'node' && selected.info">
         <div class="kv"><span>排队车辆</span><span class="mono">{{ selected.info.queue_length ?? 0 }} 辆</span></div>
@@ -1350,6 +1358,19 @@ onBeforeUnmount(() => {
 .route-list { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .route .route-list:hover { white-space: normal; overflow: visible; }
 .info-err { color: var(--signal-red); font-size: 11px; }
+.advice-block {
+  margin-top: 6px; padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-ctrl);
+  background: var(--bg-elev);
+}
+.advice-state { display: flex; align-items: baseline; gap: 6px; }
+.advice-title { font-size: 11px; color: var(--text-3); }
+.advice-state .mono { font-size: 14px; font-weight: 700; color: var(--accent); }
+.advice-state.畅通 .mono { color: var(--signal-green); }
+.advice-state.缓行 .mono { color: var(--accent); }
+.advice-state.拥堵 .mono { color: var(--signal-red); }
+.advice-lv { font-size: 11px; color: var(--text-2); }
+.advice-reason { font-size: 10px; color: var(--text-3); margin-top: 3px; line-height: 1.5; }
 .add-row { display: flex; gap: 6px; margin-top: var(--space-2); }
 .add-inp { width: 60px; height: 24px; padding: 0 6px; background: var(--bg-elev); color: var(--text-1); border: 1px solid var(--border); border-radius: var(--radius-ctrl); }
 .add-btn {
