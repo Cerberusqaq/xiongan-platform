@@ -15,6 +15,7 @@ export const useSimStore = defineStore('sim', {
     lastNetPath: null,
     currentEdges: [],        // 当前加载路网的边 id 列表（画布解析后写入，供 Agent/事件用）
     startScheme: 'scheme_2', // 启动方案：none | scheme_1 | scheme_2 | scheme_3
+    startScenario: '',       // 启动交通场景：''=默认车流 | sparse/normal/peak/extreme
     lastError: null,
   }),
   actions: {
@@ -27,23 +28,26 @@ export const useSimStore = defineStore('sim', {
         this.simTime = s.sim_time
         this.scheme = s.scheme
       } catch (e) {
-        this.status = 'idle'
+        // 保留上一状态：瞬时网络失败/超时不应把状态误置 idle
+        //（否则 NetCanvas 会把画布清空——如暂停期间慢请求偶发超时）
         this.lastError = e.message
       }
     },
     async listNetworks() {
       try { this.nets = await apiGet('/networks') } catch { /* 后端未起 */ }
     },
-    async start({ netPath, routes = [], addFiles = [], scheme = 'scheme_2', schemeParams = {} }) {
+    async start({ netPath, routes = [], addFiles = [], scheme = 'scheme_2', schemeParams = {}, rightTurnGreen = false, scenario = '' }) {
       this.starting = true
       try {
         const d = await apiPost('/simulate/start', {
           net_path: netPath, route_files: routes, add_files: addFiles,
-          scheme, scheme_params: schemeParams,
+          scheme, scheme_params: schemeParams, right_turn_green: rightTurnGreen,
+          scenario,
         })
         this.sessionId = d.session_id
         this.lastNetPath = netPath
         this.startScheme = scheme
+        this.startScenario = scenario
         this.status = 'running'
         return d
       } finally {
@@ -58,6 +62,10 @@ export const useSimStore = defineStore('sim', {
     async pause() { await apiPost('/simulate/pause', {}) },
     async resume() { await apiPost('/simulate/resume', {}) },
     async setSpeed(v) { await apiPost('/simulate/speed', { speed: v }) },
+    /** 右转常绿开关：运行中实时应用/还原（不要求重启仿真） */
+    async setRightTurnGreen(enabled) {
+      return apiPost('/simulate/right-turn-green', { enabled: !!enabled })
+    },
     /** 方案配置动作：POST /schemes/{id}/config {action, params} */
     async schemeAction(schemeId, action, params = {}) {
       return apiPost(`/schemes/${schemeId}/config`, { action, params })

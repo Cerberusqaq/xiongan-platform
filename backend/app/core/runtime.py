@@ -2,6 +2,9 @@
 
 from app.core.datacollector import DataCollector
 from app.core.engine import Engine
+from app.core.safety_net import SafetyNet
+from app.core.scenarios import (SCENARIOS, WARMUP_STEPS,
+                                generate_flow_route_file, list_scenarios)
 from app.core.session import Session, SessionError
 from app.errors import SchemeError
 from app.events.injector import EventInjector
@@ -38,6 +41,8 @@ class AppRuntime:
         self.session: Session | None = None
         self.collector: DataCollector | None = None
         self.scheme = None
+        self.safety_net: SafetyNet | None = None
+        self.scenario: str = ""   # 当前交通场景 id（""=默认车流）
         self.store = MetricsStore()
         self.injector: EventInjector | None = None
         self._net_path = ""
@@ -59,17 +64,52 @@ class AppRuntime:
             self._ensure_network(params.get("net_path"))
         except Exception as exc:  # 路网解析失败要如实报错，不能静默吞掉
             raise SessionError(1005, f"路网解析失败: {exc}") from exc
+        # 交通场景：指定场景时按其密度生成一次性投放车流文件，替换默认 route 文件，
+        # 并开启启动预热（无头高倍速投放+散开，期间前端不渲染，投放完再渲染）。
+        # （复用路网自带路由；场景为启动参数，与"右转常绿/方案"正交）
+        scenario = params.get("scenario") or ""
+        if scenario and scenario in SCENARIOS:
+            try:
+                gen = generate_flow_route_file(
+                    self._net_path, scenario,
+                    (params.get("route_files") or [None])[0])
+                params = {**params, "route_files": [gen],
+                          "warmup": WARMUP_STEPS}
+            except Exception:  # noqa: BLE001 生成失败回退默认车流，不阻塞启动
+                scenario = ""
+        else:
+            scenario = "" if scenario == "none" else scenario
+        self.scenario = scenario or ""
         self.session = Session(engine_factory=self._engine_factory,
                                step_handler=self._on_step)
-        sid = self.session.start(params)
-        self.collector = DataCollector(self.session.engine)
-        self.injector = EventInjector(SchemeContext(
-            engine=self.session.engine, push_event=self._push_event))
-        self.scheme = self._build_scheme(params.get("scheme", "none"),
-                                         params.get("scheme_params") or {})
-        if self.scheme is not None:
-            self.scheme.init()
-        return {"session_id": sid, "status": self.status()}
+        try:
+            sid = self.session.start(params)
+            self.collector = DataCollector(self.session.engine)
+            self.injector = EventInjector(SchemeContext(
+                engine=self.session.engine, push_event=self._push_event))
+            self.scheme = self._build_scheme(params.get("scheme", "none"),
+                                             params.get("scheme_params") or {})
+            if self.scheme is not None:
+                self.scheme.init()
+            # 方案无关安全网（防溢出示绿 + 死锁清空），scheme 之后每步执行
+            self.safety_net = SafetyNet(self.session.engine,
+                                        params.get("safety_net") or {})
+            return {"session_id": sid, "status": self.status()}
+        except Exception:
+            # 启动失败完整复位：关闭半开连接并清空状态，避免残留死会话
+            # （"Connection 'default' is already active"）阻塞后续启动
+            try:
+                if self.session is not None and self.session.engine is not None:
+                    self.session.engine.close()
+            except Exception:  # noqa: BLE001 关闭失败不掩盖原始错误
+                pass
+            self.session = None
+            self.collector = None
+            self.injector = None
+            self.scheme = None
+            self.scenario = ""
+            self._net_path = ""
+            raise
 
     def stop(self) -> dict:
         if self.session is None:
@@ -82,6 +122,8 @@ class AppRuntime:
         self.session = None
         self.collector = None
         self.scheme = None
+        self.safety_net = None
+        self.scenario = ""
         self.injector = None
         self.test_vehicle = None
         self._geojson = None
@@ -106,17 +148,37 @@ class AppRuntime:
         self._require_session().set_speed(speed)
         return {"ok": True}
 
+    def set_right_turn_green(self, enabled: bool) -> dict:
+        """右转常绿开关（仿真运行中实时生效，不要求重启）。
+
+        未启动仿真时安全返回（前端只在运行中调用）。
+        """
+        if self.session is None or self.session.engine is None:
+            return {"ok": False, "applied": False, "reason": "no_sim"}
+        self.session.engine.set_right_turn_green(bool(enabled))
+        return {"ok": True, "applied": True, "enabled": bool(enabled)}
+
     def status(self) -> dict:
         if self.session is None:
             return {"state": "idle", "session_id": None, "step": 0,
-                    "sim_time": 0, "scheme": "none", "vehicle_count": 0}
-        return self.session.status()
+                    "sim_time": 0, "scheme": "none", "scenario": "",
+                    "vehicle_count": 0}
+        st = self.session.status()
+        st["scenario"] = self.scenario
+        st["safety_net"] = self.safety_net.status() if self.safety_net else None
+        return st
+
+    def list_scenarios(self) -> list[dict]:
+        """可选交通场景清单（前端右上角下拉）。"""
+        return list_scenarios()
 
     # ── 每步回调（仿真线程） ─────────────────────────────────
 
     def _on_step(self, engine, step: int) -> None:
         if self.scheme is not None:
             self.scheme.on_step()
+        if self.safety_net is not None:
+            self.safety_net.on_step(step)
         self._track_test_vehicle()
         data = self.collector.collect(step)
         # 每步轻量平均速度：既推给前端实时显示，也入历史供底部栏曲线

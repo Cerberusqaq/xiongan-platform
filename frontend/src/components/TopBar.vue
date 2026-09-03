@@ -2,15 +2,13 @@
 import { computed, ref, watch } from 'vue'
 import AppButton from './ui/AppButton.vue'
 import { useSimStore } from '../stores/sim'
-import { useAgentStore } from '../stores/agent'
 import { useUiStore } from '../stores/ui'
 import { apiGet, apiUpload } from '../api/http'
 
 defineProps({ busy: { type: Boolean, default: false } })
-const emit = defineEmits(['start', 'stop', 'pause', 'resume', 'speed', 'toggle-theme', 'toggle-view', 'open-settings'])
+const emit = defineEmits(['start', 'stop', 'pause', 'resume', 'speed', 'toggle-view', 'open-settings'])
 
 const sim = useSimStore()
-const agent = useAgentStore()
 const ui = useUiStore()
 
 const speed = ref(1)
@@ -57,7 +55,7 @@ function pickDefault(net) {
 function onStart() {
   const net = sim.nets.find((n) => n.net_path === selected.value)
   if (!net) return
-  emit('start', { net, scheme: scheme.value, ...pickDefault(net) })
+  emit('start', { net, scheme: scheme.value, scenario: ui.scenario, ...pickDefault(net) })
 }
 
 async function onUpload(ev) {
@@ -80,7 +78,6 @@ async function onUpload(ev) {
     <div class="brand">
       <span class="brand-dot" />
       <span class="brand-name">车路云协同管控平台</span>
-      <span class="brand-sub">雄安 · 城市大脑</span>
     </div>
 
     <div class="group">
@@ -110,12 +107,20 @@ async function onUpload(ev) {
       <select v-model="scheme" class="ctrl" :disabled="sim.status !== 'idle'" title="控制方案">
         <option v-for="s in SCHEMES" :key="s.value" :value="s.value">{{ s.label }}</option>
       </select>
-      <AppButton variant="primary" :disabled="!selected || sim.status !== 'idle' || busy" @click="onStart">
-        {{ busy ? '启动中…' : '启动仿真' }}
+      <AppButton variant="primary" class="ic-btn" :disabled="!selected || sim.status !== 'idle' || busy"
+        @click="onStart" :title="busy ? '启动中…' : '启动仿真'">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.6v10.8l9.2-5.4z"/></svg>
       </AppButton>
-      <AppButton :disabled="sim.status === 'idle' || busy" @click="emit('stop')">停止</AppButton>
-      <AppButton :disabled="sim.status !== 'running'" @click="emit('pause')">暂停</AppButton>
-      <AppButton :disabled="sim.status !== 'paused'" @click="emit('resume')">恢复</AppButton>
+      <AppButton class="ic-btn" variant="danger" :disabled="sim.status === 'idle' || busy"
+        @click="emit('stop')" title="停止">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.4" y="3.4" width="9.2" height="9.2" rx="1.4"/></svg>
+      </AppButton>
+      <AppButton class="ic-btn" :disabled="sim.status !== 'running'" @click="emit('pause')" title="暂停">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.4" y="2.4" width="3.4" height="11.2" rx="0.9"/><rect x="9.2" y="2.4" width="3.4" height="11.2" rx="0.9"/></svg>
+      </AppButton>
+      <AppButton class="ic-btn" variant="success" :disabled="sim.status !== 'paused'" @click="emit('resume')" title="恢复">
+        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.6v10.8l9.2-5.4z"/></svg>
+      </AppButton>
       <select v-model="speed" class="ctrl" :disabled="sim.status === 'idle'" @change="emit('speed', Number(speed))">
         <option :value="1">1×</option><option :value="2">2×</option><option :value="5">5×</option>
       </select>
@@ -127,16 +132,7 @@ async function onUpload(ev) {
         <span>{{ statusMeta.label }}</span>
         <span v-if="sim.status !== 'idle'" class="mono step">步 {{ sim.step }} · {{ Math.floor(sim.simTime / 60) }}:{{ String(sim.simTime % 60).padStart(2, '0') }}</span>
       </span>
-      <span class="llm-chip" :class="{ off: !agent.status }">
-        <i class="llm-dot" />
-        LLM · <span class="mono">{{ agent.status ? agent.status.model : '未连接' }}</span>
-      </span>
-      <AppButton @click="emit('toggle-theme')" title="深浅色切换">主题</AppButton>
       <AppButton @click="emit('open-settings')" title="设置">设置</AppButton>
-      <AppButton :variant="ui.testMode ? 'success' : 'ghost'" @click="ui.setTestMode(!ui.testMode)"
-        title="测试车辆：在画布点击道路选择路线，单车行驶并统计等待">
-        测试车辆
-      </AppButton>
       <AppButton :variant="ui.viewMode === 'normal' ? 'primary' : 'success'" @click="emit('toggle-view')"
         :title="ui.viewMode === 'normal' ? '切换到专业模式' : '切换到普通模式'">
         {{ ui.viewMode === 'normal' ? '普通模式' : '专业模式' }}
@@ -147,26 +143,33 @@ async function onUpload(ev) {
 
 <style scoped>
 .topbar {
-  height: var(--topbar-h);
-  display: flex; align-items: center; gap: var(--space-4);
-  padding: 0 var(--space-4);
+  min-height: var(--topbar-h);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4);
+  padding: 6px var(--space-4);
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
 }
-.brand { display: flex; align-items: center; gap: var(--space-2); }
+.brand { display: flex; align-items: center; gap: var(--space-2); flex: 0 0 auto; }
 .brand-dot {
   width: 10px; height: 10px; border-radius: 50%;
   background: var(--accent); box-shadow: var(--glow-accent);
 }
 .brand-name { font-size: 14px; font-weight: 700; letter-spacing: 0.03em; }
-.brand-sub { font-size: 11px; color: var(--text-3); margin-left: 2px; }
-.group { display: flex; align-items: center; gap: var(--space-2); }
-.group.right { margin-left: auto; }
+.group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.group.right { margin-left: auto; flex: 0 0 auto; }
 .ctrl {
   height: 28px; padding: 0 8px; max-width: 220px;
   background: var(--bg-elev); color: var(--text-1);
   border: 1px solid var(--border); border-radius: var(--radius-ctrl);
   font-size: 12px;
+}
+/* 播放/停止/暂停 图标按钮（经典三角方块，仅图标） */
+.ic-btn {
+  width: 30px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ic-btn .ic {
+  width: 13px; height: 13px; fill: currentColor; display: block;
 }
 .net-dd { position: relative; }
 .net-btn { max-width: 240px; white-space: nowrap; text-align: left; cursor: pointer; }
@@ -191,17 +194,15 @@ async function onUpload(ev) {
 }
 .dd-preview img { width: 100%; border-radius: 4px; display: block; }
 .dd-preview-name { font-size: 11px; color: var(--text-2); padding: 4px 2px 0; }
-.sim-chip, .llm-chip {
+.sim-chip {
   display: inline-flex; align-items: center; gap: 6px;
   height: 26px; padding: 0 10px;
   border: 1px solid var(--border); border-radius: 999px;
   font-size: 11px; color: var(--text-2); background: var(--bg-elev);
 }
-.sim-chip .dot, .llm-dot { width: 7px; height: 7px; border-radius: 50%; }
+.sim-chip .dot { width: 7px; height: 7px; border-radius: 50%; }
 .sim-chip.run .dot { background: var(--signal-green); box-shadow: 0 0 6px var(--signal-green); }
 .sim-chip.pause .dot { background: var(--accent); }
 .sim-chip.idle .dot { background: var(--text-3); }
-.llm-dot { background: var(--signal-green); }
-.llm-chip.off .llm-dot { background: var(--signal-red); }
 .step { color: var(--text-3); font-size: 10px; }
 </style>

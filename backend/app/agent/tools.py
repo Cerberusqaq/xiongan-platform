@@ -11,7 +11,7 @@ import json
 TOOL_SCHEMAS = [
     {"type": "function", "function": {
         "name": "get_network_status",
-        "description": "获取路网全局实时指标（在网车辆数、平均速度、平均等待时间、平均排队）",
+        "description": "获取路网全局实时指标（在网车辆数、平均速度、平均等待时间、平均排队）（速度单位 m/s，汇报请换算为 km/h）",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {
         "name": "get_tls_status",
@@ -21,7 +21,7 @@ TOOL_SCHEMAS = [
                        "required": ["tls_id"]}}},
     {"type": "function", "function": {
         "name": "get_edge_status",
-        "description": "获取某条道路的实时状态（车辆数、平均速度、占有率、限速），用于评估通行/给出建议车速",
+        "description": "获取某条道路的实时状态（车辆数、平均速度、占有率、限速），用于评估通行/给出建议车速（速度单位 m/s，汇报请换算为 km/h）",
         "parameters": {"type": "object",
                        "properties": {"edge_id": {"type": "string", "description": "道路 id"}},
                        "required": ["edge_id"]}}},
@@ -73,7 +73,7 @@ TOOL_SCHEMAS = [
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {
         "name": "get_region_status",
-        "description": "获取一片区域的聚合实时指标（车辆数/平均速度/排队/拥堵度）；edges 传边 id 列表，不传则覆盖全路网",
+        "description": "获取一片区域的聚合实时指标（车辆数/平均速度/排队/拥堵度）；edges 传边 id 列表，不传则覆盖全路网（速度单位 m/s，汇报请换算为 km/h）",
         "parameters": {"type": "object",
                        "properties": {"edges": {"type": "array", "items": {"type": "string"},
                                                 "description": "区域包含的边 id 列表（可选，默认全路网）"}},
@@ -97,7 +97,7 @@ TOOL_SCHEMAS = [
                        "required": ["algorithm_id", "action"]}}},
     {"type": "function", "function": {
         "name": "compare_metrics",
-        "description": "对比调控前后指标：action=set 记录当前指标为基线；action=compare 与基线对比返回差异（对比后清除基线）；action=clear 清除基线",
+        "description": "对比调控前后指标：action=set 记录当前指标为基线；action=compare 与基线对比返回差异（对比后清除基线）；action=clear 清除基线（返回速度单位 m/s，汇报请换算为 km/h）",
         "parameters": {"type": "object",
                        "properties": {"action": {"type": "string",
                                                  "enum": ["set", "compare", "clear"],
@@ -204,7 +204,7 @@ def execute_tool(runtime, name: str, args: dict) -> dict:
             lines = [
                 f"# 态势报告（仿真步 {st.get('step')}）",
                 f"- 在网车辆：{m.get('vehicle_count')}",
-                f"- 平均速度：{m.get('avg_speed')} m/s",
+                f"- 平均速度：{round((m.get('avg_speed') or 0) * 3.6, 1)} km/h",
                 f"- 平均等待：{m.get('avg_waiting_time')} s",
                 f"- 平均排队：{m.get('avg_queue_length')} 辆",
                 f"- 累计到达：{m.get('total_throughput')}",

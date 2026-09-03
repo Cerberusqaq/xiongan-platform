@@ -29,6 +29,8 @@ class Engine:
         self._cum_departed = 0
         self._edge_length_cache: dict[str, float] = {}
         self._edge_speed_cache: dict[str, float] = {}
+        self._conn_dir_map: dict[str, list[str]] = {}  # tls_id -> 按 linkIndex 升序的 dir 列表
+        self._rt_original: dict[str, dict] = {}  # tls_id -> 右转常绿覆写前的原程序快照
 
     # ── 生命周期 ────────────────────────────────────────────
 
@@ -46,13 +48,37 @@ class Engine:
         for af in add_files or []:
             cmd += ["-a", af]
         try:
-            traci.start(cmd)
+            # ── TraCI 连接（跨机器兼容版）──────────────────────────
+            # 部分 Windows 机器上 "localhost" 会优先解析到 ::1（sumo 只监听
+            # IPv4），且连接未监听端口会挂起而非快速拒绝，导致 traci.start
+            # 默认流程卡死。这里改为：手动指定空闲端口 + 显式 127.0.0.1 +
+            # 先等 sumo 打开 TraCI 端口再连接。该写法在所有机器上均兼容。
+            import socket as _socket
+            import subprocess
+            import time
+            _s = _socket.socket()
+            _s.bind(("", 0))
+            port = _s.getsockname()[1]
+            _s.close()
+            proc = subprocess.Popen(
+                cmd + ["--remote-port", str(port)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL)
+            # sumo 的 TraCI 端口在加载路网前就会打开，等待 4s 足够；
+            # 若 sumo 提前崩溃则立即报错，避免静默卡死。
+            _start = time.time()
+            while time.time() - _start < 4.0:
+                if proc.poll() is not None:
+                    raise RuntimeError(f"sumo 提前退出(code={proc.returncode})")
+                time.sleep(0.2)
+            traci.init(port, host="127.0.0.1", proc=proc, numRetries=10)
         except Exception as exc:  # noqa: BLE001 统一转成 EngineError 上报
             raise EngineError(1006, f"仿真启动失败: {exc}") from exc
         self._connected = True
         self._net_file = net_file
         self._route_files = route_files or []
         self._step = 0
+        self._rt_original.clear()  # 新仿真进程，丢弃上个会话的右转原程序快照
 
     def close(self) -> None:
         if self._connected:
@@ -60,6 +86,22 @@ class Engine:
                 traci.close()
             except Exception:  # noqa: BLE001 关闭失败不阻塞
                 pass
+        # 强制清理 traci 连接注册表：失败的 init 会在握手前就注册 'default'
+        #（traci/connection.py __init__ 先 _connections[label]=self 再握手），
+        # 而 traci.close() 只清理 ""（switch 后的别名）→ 残留 'default' 会
+        # 导致下次 connect 报 "Connection 'default' is already active"。
+        # 这里遍历注册表逐个关闭，彻底杜绝该残留。
+        try:
+            from traci import connection as _tcon
+            for _lbl in list(_tcon._connections.keys()):
+                _con = _tcon._connections.pop(_lbl, None)
+                if _con is not None:
+                    try:
+                        _con.close()
+                    except Exception:  # noqa: BLE001
+                        pass
+        except Exception:  # noqa: BLE001
+            pass
         self._connected = False
 
     def step(self) -> int:
@@ -284,13 +326,15 @@ class Engine:
             raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
 
     def get_tls_links(self, tls_id: str) -> list[dict]:
-        """受控 link 列表（与 state_str 字符一一对应）：[{from_edge, from_lane}]。
+        """受控 link 列表（与 state_str 字符一一对应）：[{from_edge, from_lane, dir}]。
 
         前端据此在对应进口方向绘制逐车道信号灯。静态数据，按 tls 缓存。
+        dir 取自 net.xml 连接定义（s/l/r/t），供"隐藏右转灯"等按转向过滤。
         """
         cached = self._tls_links_cache.get(tls_id)
         if cached is not None:
             return cached
+        self._load_conn_dir_map()
         links: list[dict] = []
         try:
             raw = traci.trafficlight.getControlledLinks(tls_id)
@@ -316,11 +360,120 @@ class Engine:
                         lane_idx = int(tail)
                 if not edge:
                     continue
-                links.append({"from_edge": edge, "from_lane": lane_idx})
+                links.append({
+                    "from_edge": edge,
+                    "from_lane": lane_idx,
+                    # link 顺序与 state_str 字符、net.xml linkIndex 一一对应
+                    "dir": self._dir_at(tls_id, len(links)),
+                })
         except traci.TraCIException:  # noqa: BLE001
             pass
         self._tls_links_cache[tls_id] = links
         return links
+
+    def get_tls_conn_details(self, tls_id: str) -> list[dict]:
+        """受控 link 的详细连接信息（与 state_str 字符一一对应）。
+
+        [{from_edge, from_lane, via_lane, to_edge, dir}]：via_lane 是路口内
+        内部车道（若有），to_edge 是出口边（供防溢出示绿判堵）。
+        防御式解析：getControlledLinks 在不同 SUMO 版本/路网下的元组顺序
+        可能为 (from, via, to) 或 (from, to, via)，按":"内道前缀区分。
+        """
+        cached = self._tls_links_cache.get(tls_id)
+        if cached is not None and "via_lane" in (cached[0] if cached else {}):
+            return cached
+        self._load_conn_dir_map()
+        links: list[dict] = []
+        try:
+            raw = traci.trafficlight.getControlledLinks(tls_id)
+            for lnk in raw:
+                inner = lnk[0] if (len(lnk) == 1 and isinstance(lnk[0], tuple)) else lnk
+                parts = tuple(inner)
+                if not parts:
+                    continue
+                frm = parts[0]
+                if isinstance(frm, (tuple, list)):
+                    lane_id = str(frm[0])
+                    lane_idx = int(frm[1]) if len(frm) > 1 and isinstance(frm[1], int) else 0
+                else:
+                    lane_id = str(frm)
+                    lane_idx = 0
+                if not lane_id:
+                    continue
+                edge = lane_id.rpartition("_")[0]
+                if lane_idx == 0 and "_" in lane_id:
+                    tail = lane_id.rsplit("_", 1)[-1]
+                    if tail.isdigit():
+                        lane_idx = int(tail)
+                # 出口边/内部车道：parts[1..2] 防御式区分
+                def _lane_name(x):
+                    if isinstance(x, (tuple, list)) and x:
+                        return str(x[0])
+                    return str(x) if x else ""
+                p1, p2 = _lane_name(parts[1] if len(parts) > 1 else ""), \
+                         _lane_name(parts[2] if len(parts) > 2 else "")
+                if p1.startswith(":"):
+                    via, to_lane = p1, p2
+                elif p2.startswith(":"):
+                    via, to_lane = p2, p1
+                else:
+                    via, to_lane = "", p1 or p2
+                links.append({
+                    "from_edge": edge,
+                    "from_lane": lane_idx,
+                    "via_lane": via,
+                    "to_edge": to_lane.rpartition("_")[0] if to_lane else "",
+                    # 本地序号（0..n-1）索引升序 dir 列表 → 与 state_str 字符对齐
+                    "dir": self._dir_at(tls_id, len(links)),
+                })
+        except traci.TraCIException:  # noqa: BLE001
+            pass
+        self._tls_links_cache[tls_id] = links
+        return links
+
+    def _load_conn_dir_map(self) -> None:
+        """解析 net.xml 的连接定义：tls_id -> 按 linkIndex 升序的 dir 列表。
+
+        <connection ... tl linkIndex dir/> 中 linkIndex 是该 tls **全局**受控序号
+        （多信号机共享 tls 时从 0 起连续递增，如某 tls 的受控连接可能是 15~19），
+        state_str 字符序 = 该 tls 受控连接按 linkIndex 升序。因此把每个 tls 的
+        dir 按 linkIndex 升序存成列表，运行时用本地序号（0..n-1）索引即可与
+        state_str 字符一一对应。惰性加载 + 进程内缓存。
+        """
+        if self._conn_dir_map or not self._net_file:
+            return
+        import xml.etree.ElementTree as ET
+        collected: dict[str, dict[int, str]] = {}
+        try:
+            root = ET.parse(self._net_file).getroot()
+            for c in root.iter("connection"):
+                tl = c.get("tl")
+                idx = c.get("linkIndex")
+                d = c.get("dir")
+                if tl is None or idx is None or d is None:
+                    continue
+                collected.setdefault(tl, {})[int(idx)] = d
+        except Exception:  # noqa: BLE001 解析失败则右转相关功能不可用
+            self._conn_dir_map = {}
+            return
+        for tl, idx_dir in collected.items():
+            self._conn_dir_map[tl] = [d for _, d in sorted(idx_dir.items())]
+
+    def _dir_at(self, tls_id: str, local_idx: int) -> str:
+        """该 tls 本地第 local_idx 个受控 link 的转向（s/l/r/t），越界返回空串。"""
+        dirs = self._conn_dir_map.get(tls_id)
+        if not dirs:
+            return ""
+        return dirs[local_idx] if 0 <= local_idx < len(dirs) else ""
+
+    def right_turn_link_indices(self, tls_id: str) -> list[int]:
+        """该信号机状态字中属于右转的字符下标（本地序，与 state_str 对齐）。
+
+        SUMO 的 dir 大小写都可能出现（'r'/'R'），统一视为右转。
+        """
+        self._load_conn_dir_map()
+        dirs = self._conn_dir_map.get(tls_id, [])
+        return [i for i, d in enumerate(dirs) if d in ("r", "R")]
 
     def _tls_phase_count(self, tls_id: str) -> int:
         """当前信号方案的相位总数（缓存，避免高频调用昂贵定义接口）。"""
@@ -357,6 +510,91 @@ class Engine:
         except traci.TraCIException as exc:
             raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
         self._tls_phase_cache.pop(tls_id, None)
+
+    def apply_right_turn_always_green(self) -> None:
+        """右转常绿：运行时把每个信号机程序中右转 link 的状态字强制为 g（次要绿）。
+
+        实现要点（兼容所有方案，含 legacy MAPPO）：
+        - 用小写 'g'（让行绿/次要绿）而非大写 'G'：右转与直行共用车道时，
+          SUMO 会告警 "Unsafe green phase ... targeted by 2 'G'-links"，且
+          'g' 更符合真实工程（右转常绿但需让行直行/冲突车流）；
+        - 仅"相位内已有其他绿"时把右转位置 g；全红清空相保持全红，不引入
+          新的绿灯相 → 相位数量/结构不变，各方案观测与动作维度全部不受影响
+          （green_phases 判断为 G 或 g，故 g 也不会改变绿相计数）；
+        - 首次应用前记录原程序快照（_rt_original），供"关闭右转常绿"还原；
+        - 用 setProgramLogic 整程序替换（保留原 programID 与相位时长）。
+        """
+        self._require_connected()
+        for tid in self.get_tls_ids():
+            right = self.right_turn_link_indices(tid)
+            if not right:
+                continue
+            try:
+                logics = traci.trafficlight.getCompleteRedYellowGreenDefinition(tid)
+                active = traci.trafficlight.getProgram(tid)
+                logic = next((lg for lg in logics if lg.programID == active),
+                             logics[0])
+                # 首次应用时记录原程序快照（重复应用不覆盖，保证可还原）
+                if tid not in self._rt_original:
+                    self._rt_original[tid] = self._snapshot_logic(logic)
+                changed = False
+                for ph in logic.phases:
+                    st = list(ph.state)
+                    # 该相位除右转外是否已有绿（全红清空相跳过，保持相位数不变）
+                    has_green_other = any(
+                        i not in right and ch in "Gg" for i, ch in enumerate(st))
+                    if not has_green_other:
+                        continue
+                    for i in right:
+                        if i < len(st):
+                            st[i] = "g"
+                            changed = True
+                    ph.state = "".join(st)
+                if changed:
+                    traci.trafficlight.setProgramLogic(tid, logic)
+                    self._tls_phase_cache.pop(tid, None)
+            except Exception as exc:  # noqa: BLE001 单个路口失败不阻塞其余路口
+                continue
+
+    @staticmethod
+    def _snapshot_logic(logic) -> dict:
+        """把 traci Logic 对象转成可安全还原的快照（深拷贝相位数据）。"""
+        return {
+            "programID": logic.programID,
+            "type": logic.type,
+            "currentPhaseIndex": logic.currentPhaseIndex,
+            "subParameter": dict(logic.subParameter or {}),
+            "phases": [(ph.duration, ph.state, ph.minDur, ph.maxDur, ph.next, ph.name)
+                       for ph in logic.phases],
+        }
+
+    def restore_right_turn_always_green(self) -> None:
+        """关闭右转常绿：用记录的原程序快照还原所有被覆写的信号机。"""
+        self._require_connected()
+        for tid, snap in list(self._rt_original.items()):
+            try:
+                logic = self._build_logic_from_snapshot(snap)
+                traci.trafficlight.setProgramLogic(tid, logic)
+                self._tls_phase_cache.pop(tid, None)
+            except Exception:  # noqa: BLE001 单个路口还原失败不阻塞其余路口
+                continue
+        self._rt_original.clear()
+
+    def set_right_turn_green(self, enabled: bool) -> None:
+        """右转常绿开关（可在仿真运行中实时调用）：enabled=True 应用，False 还原。"""
+        if enabled:
+            self.apply_right_turn_always_green()
+        else:
+            self.restore_right_turn_always_green()
+
+    def _build_logic_from_snapshot(self, snap: dict):
+        """从快照重建 traci Logic 对象（供还原 setProgramLogic）。"""
+        from traci._trafficlight import Logic
+        from sumolib.net import Phase
+        phases = [Phase(d, s, mn, mx, nxt, nm)
+                  for (d, s, mn, mx, nxt, nm) in snap["phases"]]
+        return Logic(snap["programID"], snap["type"], snap["currentPhaseIndex"],
+                     phases, snap.get("subParameter") or {})
 
     def get_vehicle_emissions(self, veh_id: str) -> dict:
         """车辆累计排放/油耗：fuel(L), co2/co/nox(g)。"""

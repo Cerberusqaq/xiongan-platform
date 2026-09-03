@@ -57,7 +57,19 @@ class Session:
                     sim_params.get("step_length", 1.0),
                 )
             except EngineError as exc:
+                # 连接失败要关闭可能半开的 traci 连接，避免残留
+                # "Connection 'default' is already active" 阻塞后续启动
+                try:
+                    engine.close()
+                except Exception:  # noqa: BLE001 关闭失败不掩盖原始错误
+                    pass
                 raise SessionError(1006, f"仿真连接失败: {exc.message}") from exc
+            # 右转常绿：在仿真线程启动前覆写信号程序（无竞态，跨机器/跨方案通用）
+            if sim_params.get("right_turn_green"):
+                try:
+                    engine.apply_right_turn_always_green()
+                except Exception:  # noqa: BLE001 覆写失败不阻塞启动
+                    pass
             self._engine = engine
             self._sim_params = sim_params
             self._session_id = uuid.uuid4().hex[:8]
@@ -67,6 +79,16 @@ class Session:
             self._stop_evt.clear()
             self._pause_evt.set() if self._speed == 0 else self._pause_evt.clear()
             self._state = "running"
+            # 启动预热（场景一次性投放用）：无头高倍速直接步进——不调用 step_handler、
+            # 不向前端推送、不休眠，让车辆散开/形成排队后再启动线程，实现
+            # "投放时不渲染、投放完再渲染"。预热失败不阻塞启动（车辆已投放）。
+            warmup = int(sim_params.get("warmup") or 0)
+            if warmup > 0:
+                try:
+                    for _ in range(warmup):
+                        self._step = engine.step()
+                except Exception:  # noqa: BLE001
+                    pass
             self._thread = threading.Thread(target=self._run, daemon=True)
             self._thread.start()
             return self._session_id

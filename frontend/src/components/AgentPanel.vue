@@ -165,6 +165,11 @@ async function send(text = input.value) {
           <span class="tools-title">Agent 技能清单（{{ agent.tools.length }}）</span>
           <button class="tools-close" @click="toolsOpen = false">×</button>
         </div>
+        <div class="tools-model">
+          <i class="tools-model-dot" :class="{ off: !agent.status }" />
+          <span class="tools-model-label">当前模型</span>
+          <span class="tools-model-name mono">{{ agent.status?.model || '未连接' }}</span>
+        </div>
         <div v-if="!agent.tools.length" class="tools-empty">技能列表加载中…</div>
         <div v-for="t in agent.tools" :key="t.name" class="tool-card">
           <div class="tool-name-row">
@@ -310,6 +315,16 @@ async function send(text = input.value) {
 .tools-title { font-size: 15px; font-weight: 700; }
 .tools-close { border: none; background: none; color: var(--text-3); font-size: 20px; cursor: pointer; }
 .tools-close:hover { color: var(--signal-red); }
+.tools-model {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; margin-bottom: var(--space-3);
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: var(--radius-ctrl); font-size: 12px; color: var(--text-2);
+}
+.tools-model-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--signal-green); flex: 0 0 auto; }
+.tools-model-dot.off { background: var(--signal-red); }
+.tools-model-label { flex: 0 0 auto; }
+.tools-model-name { color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tools-empty { font-size: 12px; color: var(--text-3); padding: 16px 0; text-align: center; }
 .tool-card {
   border: 1px solid var(--border); border-radius: var(--radius-panel);

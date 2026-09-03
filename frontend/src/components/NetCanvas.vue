@@ -42,6 +42,9 @@ const tlsData = new Map()      // tls_id -> {state_str, links}
 const colors = ref({})
 
 const view = { scale: 1, tx: 0, ty: 0 }
+// 最小缩放比例（缩小下限）：避免缩得过小导致道路/信号灯不可读。
+// 实测全屏 fit≈0.70、典型窗口≈0.58，取 0.5 允许略缩出全貌但保持最小可读尺寸（可按需调整）
+const MIN_SCALE = 0.5
 // 世界→屏幕（模块级，供命中检测等 draw() 之外使用）
 const X = (x) => x * view.scale + view.tx
 const Y = (y) => -y * view.scale + view.ty
@@ -53,6 +56,16 @@ let unsubs = []
 
 // 类型颜色（仅非默认类型生效，如 bus/fleet/truck/bicycle）
 const TYPE_COLORS = { bus: '#ff6b6b', fleet: '#ffa94d', truck: '#b197fc', bicycle: '#63e6be' }
+
+// 交通场景（画布右上角选择，启动参数）：''=默认车流，其余由后端按密度生成
+const DEFAULT_SCENARIOS = [
+  { value: '', label: '默认车流' },
+  { value: 'sparse', label: '深夜 · 低流量' },
+  { value: 'normal', label: '平峰 · 中流量' },
+  { value: 'peak', label: '高峰 · 高流量' },
+  { value: 'extreme', label: '极高峰 · 拥堵' },
+]
+const scenarioOptions = ref(DEFAULT_SCENARIOS)
 // SUMO 类型 id → 中文名（DEFAULT_VEHTYPE 是 SUMO 默认小汽车）
 const VEH_TYPE_LABELS = {
   DEFAULT_VEHTYPE: '小汽车',
@@ -96,6 +109,9 @@ async function loadNetwork() {
     const feats = gj.features || []
     if (!feats.length) { clearNet(); hint.value = '请先启动仿真以加载路网'; return }
     parseGeo(feats)
+    // 路网几何就绪后修正静止车朝向（首批车辆可能早于 edgeMap 到达，
+    // 初始朝向回退过 SUMO angle，对"插入即停"的排队车会是错的方向）
+    fixStaticHeadings()
     const running = sim.nets.find((n) => n.net_path === sim.lastNetPath)
     if (running) {
       netName.value = running.label || running.name
@@ -246,6 +262,17 @@ function initHeading(v) {
   return -((v.angle || 0) * Math.PI) / 180
 }
 
+/** edgeMap 就绪后：修正尚未被"运动方向"定过向的静止车。
+ *  场景一次性投放 + 预热时，路网几何(edgeMap)可能晚于首批车辆到达，
+ *  车辆初始朝向只能回退 SUMO angle——而 SUMO 对"插入即停、从未移动"的
+ *  排队车 angle 停在默认 0/90°，会横在路中（与车道垂直）；此处按所在
+ *  车道切线重算。车辆一旦移动，vehicleScreenPos 会以位移方向覆盖并标记。 */
+function fixStaticHeadings() {
+  for (const v of vehicles.values()) {
+    if (v._hd !== 1) v.heading = initHeading(v)
+  }
+}
+
 function handleVehicles(d) {
   if (!d) return
   const now = performance.now()
@@ -258,6 +285,7 @@ function handleVehicles(d) {
     vehicles.set(v.id, {
       ...v, px: v.x, py: v.y, t0: now,
       heading: initHeading(v),
+      _hd: 0,
     })
   }
   for (const v of d.updated || []) {
@@ -270,6 +298,7 @@ function handleVehicles(d) {
       vehicles.set(v.id, {
         ...v, px: v.x, py: v.y, t0: now,
         heading: initHeading(v),
+        _hd: 0,
       })
     }
   }
@@ -367,7 +396,7 @@ function draw(t) {
   const S = view.scale
   const X = (x) => x * S + view.tx
   const Y = (y) => -y * S + view.ty
-  const laneSep = Math.max(2.6, 3.2 * S)
+  const laneSep = 3.2 * S            // 车道间距随缩放纯比例（灯锚定道路，不设最小像素钳制）
 
   // 1) 道路：真实车道几何（SUMO lane shape）或公式回退；同向延续边在路口相接
   ctx.lineCap = 'round'
@@ -472,8 +501,143 @@ function draw(t) {
   // 3) 信号灯：逐 link（连接）一盏灯——同一车道可能有直行绿+转向红的混合状态，
   //    按 link 渲染才能如实反映"哪个方向能走"；同车道多 link 并排微偏移
   //    方向取道路自身末段方向（而非 偏移端点→路口中心，后者会因双向分离产生 ~19° 旋转偏差）
-  const lightR = Math.max(2.6, 4.2 * Math.min(1.4, S))
+  // 灯几何全部以"车道宽"（laneSep=3.2*S，纯随缩放）为单位，保证任何倍率下灯都与道路同比例锚定。
+  // 合并模式灯径：≈0.5 车道宽封顶 7px；逐车道模式的灯径/间距按 1/(n+1) 车道宽规则在下方逐组计算
+  let lightR = Math.min(7, 0.5 * laneSep)
   if (ui.settings.showLights) {
+  // 方向箭头（模拟现实方向指示信号灯）：直行↑ 右转↱(拐弯) 左转↰(拐弯) 调头U
+  // 箭头用"驶入路口方向"旋转：u=朝路口，p=司机右侧（-uy,ux）
+  const moveAngle = (dir, ux, uy, px, py) => Math.atan2(uy, ux) // 基准角=朝路口方向，拐弯方向由 dir 决定
+  const drawArrowShape = (lx, ly, ang, color, s) => {
+    ctx.save()
+    ctx.translate(lx, ly)
+    ctx.rotate(ang)
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.moveTo(s, 0)                      // 箭头尖
+    ctx.lineTo(-s * 0.15, -s * 0.55)      // 左翼尖
+    ctx.lineTo(-s * 0.15, -s * 0.18)      // 左翼内
+    ctx.lineTo(-s, -s * 0.18)             // 箭杆左
+    ctx.lineTo(-s, s * 0.18)              // 箭杆右
+    ctx.lineTo(-s * 0.15, s * 0.18)       // 右翼内
+    ctx.lineTo(-s * 0.15, s * 0.55)       // 右翼尖
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+  }
+  // 拐弯箭头（右/左转）：箭杆沿行驶方向伸入路口，在灯心拐 90° 直角，
+  // 箭头头在拐弯段末端指向转弯方向（真正的直角转弯线）
+  const drawBentArrow = (lx, ly, ang, color, s, dirSign) => {
+    ctx.save()
+    ctx.translate(lx, ly)
+    ctx.rotate(ang)                        // +x = 行驶方向（朝路口）
+    const w = Math.max(1, s * 0.32)         // 拐弯箭杆/拐弯段较粗（与直行箭头视觉呼应）
+    const L = s * 0.72                     // 直行段长度（车后方→拐点）
+    const H = s * 0.52                     // 拐弯段长度（拐点→箭头头）
+    ctx.strokeStyle = color
+    ctx.lineWidth = w
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(-L, 0)                      // 车后方（箭杆起点）
+    ctx.lineTo(0, 0)                       // 拐点
+    ctx.lineTo(0, dirSign * H)             // 直角拐弯段（右转 +y，左转 -y）
+    ctx.stroke()
+    // 箭头头：在拐弯段末端，指向转弯方向
+    ctx.save()
+    ctx.translate(0, dirSign * H)
+    ctx.rotate(dirSign * Math.PI / 2)      // 使 +x 变为转弯方向
+    const h = s * 0.5
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.moveTo(h, 0)
+    ctx.lineTo(-h * 0.55, -h * 0.6)
+    ctx.lineTo(-h * 0.2, 0)
+    ctx.lineTo(-h * 0.55, h * 0.6)
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
+    ctx.restore()
+  }
+  const drawUShape = (lx, ly, ang, color, s) => {
+    ctx.save()
+    ctx.translate(lx, ly)
+    ctx.rotate(ang)                        // +x = 行驶方向（朝路口）
+    const R = s * 0.38, L = s * 0.55
+    ctx.strokeStyle = color
+    ctx.lineWidth = Math.max(1, s * 0.34)   // U 形调头灯加粗
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(-L, -R)                      // 左腿后端（开口朝车后方）
+    ctx.lineTo(0, -R)                       // 左腿前端（弧起点）
+    ctx.arc(0, 0, R, -Math.PI / 2, Math.PI / 2, false) // 半圆朝路口前方
+    ctx.lineTo(-L, R)                       // 右腿后端
+    ctx.stroke()
+    ctx.restore()
+  }
+  // 绘制单个灯头。模式：solid 实心圆 | framed 圆框箭头（深色外壳+方向箭头）| bare 无框箭头
+  const drawLight = (lx, ly, ch, ang, dir) => {
+    const col = stateColor(ch, c)
+    const mode = ui.settings.lightMode || 'framed'
+    const s = lightR * 0.85
+    if (mode === 'solid') {
+      // 实心圆：状态色实心圆 + 弱光晕
+      ctx.fillStyle = col
+      ctx.beginPath()
+      ctx.arc(lx, ly, lightR, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = col
+      ctx.globalAlpha = 0.35
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.arc(lx, ly, lightR + 2.4, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.globalAlpha = 1
+      return
+    }
+    // 箭头模式（framed / bare）：
+    if (mode === 'framed') {
+      ctx.fillStyle = 'rgba(8, 10, 12, 0.9)'   // 深色外壳垫底
+      ctx.beginPath()
+      ctx.arc(lx, ly, lightR, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = col                     // 状态色光晕
+      ctx.globalAlpha = 0.5
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.arc(lx, ly, lightR + 2.4, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.globalAlpha = 1
+    }
+    if (ang !== null) {
+      if (dir === 't' || dir === 'T') drawUShape(lx, ly, ang, col, s)
+      else if (dir === 'r' || dir === 'R') drawBentArrow(lx, ly, ang, col, s, 1)
+      else if (dir === 'l' || dir === 'L') drawBentArrow(lx, ly, ang, col, s, -1)
+      else drawArrowShape(lx, ly, ang, col, s)
+    }
+  }
+  // 取某条车道的屏幕空间几何（真实 lane shape 或公式回退），供停车线定位
+  const laneEndPts = (e, laneIdx) => {
+    const offPx = e.off ? Math.max(3.5, e.off * S) : 0
+    return e.laneShapes && e.laneShapes[laneIdx]
+      ? screenShape(e.laneShapes[laneIdx], offPx)
+      : polyScreen(e, offPx, (laneIdx - (e.lanes - 1) / 2) * laneSep)
+  }
+  // 停车线偏移 +1.0 车道宽（即"离停车线 -1 车道宽"）：越过停车线朝路口内 1 个车道宽，
+  // 纯随缩放锚定道路（任何倍率下与路口距离恒定，不漂移）
+  const back = 0.1 * laneSep
+  // 同车道灯序：掉头→左转→直走（屏幕左→右），符合现实方向指示信号灯次序
+  const MOV_RANK = { t: 0, T: 0, l: 1, L: 1, s: 2, S: 2, r: 3, R: 3 }
+  // 合并状态：同一方向多 link 取最亮状态（绿>黄>红）
+  const mergeChar = (a, b) => {
+    const r = { G: 4, g: 3, Y: 2, y: 2, R: 1, r: 1 }
+    return (r[b] || 0) > (r[a] || 0) ? b : a
+  }
+  // 缩小到该比例以下时，同一进口所有车道灯合并为 掉头-左转-直走-右转 四灯，避免挤成一团。
+  // 阈值取 0.75：全屏默认视图 fit S≈0.7 也在合并区间，缩放行为跨窗口一致。
+  // 极简模式：每车道仅显示一个灯（仅 lightMode=bare 时可开）；此时始终走逐车道分支
+  // （每车道一灯本身不拥挤），不再合并。
+  const minimalLights = ui.settings.minimalLights && ui.settings.lightMode === 'bare'
+  const mergedLights = !minimalLights && S < 0.75
   for (const [tid, data] of tlsData) {
     const idx = tlsById.get(tid)
     if (idx === undefined) continue
@@ -482,22 +646,85 @@ function draw(t) {
     const st = data.state_str || ''
     const links = data.links || []
     if (!links.length || !st) continue
-    // 按（边, 车道）分桶，保留 link 序号用于并排偏移
+    // 合并模式（缩小到一定比例）：同一进口（from_edge）所有车道的灯合并成
+    // 掉头-左转-直走-右转 四灯，沿进口从左到右排布，避免所有灯挤成一团
+    if (mergedLights) {
+      const byEdge = new Map()
+      for (let i = 0; i < links.length && i < st.length; i++) {
+        const lk = links[i]
+        if (ui.settings.hideRightTurnLights && (lk.dir === 'r' || lk.dir === 'R')) continue
+        const e = edgeMap.get(lk.from_edge)
+        if (!e) continue
+        let g = byEdge.get(e.id)
+        if (!g) { g = { edge: e, m: {} }; byEdge.set(e.id, g) }
+        const d = lk.dir || 's'
+        g.m[d] = g.m[d] === undefined ? st[i] : mergeChar(g.m[d], st[i])
+      }
+      for (const g of byEdge.values()) {
+        const e = g.edge
+        const nearPts = (P) => {
+          const d0 = Math.hypot(P[0][0] - cx, P[0][1] - cy)
+          const d1 = Math.hypot(P[P.length - 1][0] - cx, P[P.length - 1][1] - cy)
+          const i = d0 <= d1 ? 0 : P.length - 1
+          return { ep: P[i], segA: i === 0 ? P[1] : P[i - 1] }
+        }
+        const A = nearPts(laneEndPts(e, 0))            // lane0 停车线（最右车道）
+        const B = nearPts(laneEndPts(e, e.lanes - 1))  // 最左车道停车线
+        const ep = A.ep
+        const rdx = ep[0] - A.segA[0], rdy = ep[1] - A.segA[1]
+        const rl = Math.hypot(rdx, rdy) || 1
+        const ux = rdx / rl, uy = rdy / rl
+        const px = -uy, py = ux
+        // 路中心 = 最外侧两条真实车道停车线中点（不依赖模型半路宽，避免模型/真实偏差）
+        const cxp = (ep[0] + B.ep[0]) / 2
+        const cyp = (ep[1] + B.ep[1]) / 2
+        // 顺序：掉头-左转-直走-右转（屏幕左→右）
+        const order = ['t', 'l', 's', 'r']
+        const arr = []
+        for (const m of order) if (g.m[m] !== undefined) arr.push({ dir: m, char: g.m[m] })
+        // 与逐车道同规则：n 颗灯，间距 = 容器宽/(n+1)，两侧各留一个间距（容器 = 整条路宽）
+        const n = arr.length
+        const gap = (e.lanes * laneSep) / (n + 1)
+        lightR = Math.min(7, Math.max(1.5, 0.5 * gap))  // 合并灯保持可见（下限 1.5px）
+        for (let k = 0; k < n; k++) {
+          const lat = (k - (n - 1) / 2) * gap
+          drawLight(cxp + ux * back + px * lat, cyp + uy * back + py * lat, arr[k].char, Math.atan2(uy, ux), arr[k].dir)
+        }
+      }
+      continue
+    }
+    // 按（边, 车道）分桶：一条车道同方向的多个 link（如一条车道分流入下游多车道）
+    // 合并为一颗灯（取最亮状态，见 mergeChar）；右转也并入其所在车道（最右车道 lane0），
+    // 视为该车道的一颗灯，不再单独画到路缘
     const byLane = new Map()
     for (let i = 0; i < links.length && i < st.length; i++) {
       const lk = links[i]
+      const dir = lk.dir || 's'
+      // 右转常绿时隐藏右转灯头：跳过右转 link（dir=r/R，来自 net.xml 连接定义）
+      if (ui.settings.hideRightTurnLights && (dir === 'r' || dir === 'R')) continue
       const key = `${lk.from_edge}|${lk.from_lane || 0}`
       if (!byLane.has(key)) byLane.set(key, [])
-      byLane.get(key).push({ edge: edgeMap.get(lk.from_edge), lane: lk.from_lane || 0, char: st[i] })
+      const bucket = byLane.get(key)
+      const existing = bucket.find((x) => x.dir === dir)
+      if (existing) existing.char = mergeChar(existing.char, st[i])
+      else bucket.push({ edge: edgeMap.get(lk.from_edge), lane: lk.from_lane || 0, char: st[i], dir })
     }
+    // 普通灯：各自车道停车线处并排（右转并入其车道，不再单独画到路缘）
     for (const arr of byLane.values()) {
       const e = arr[0].edge
       if (!e) continue
-      // 用真实车道几何的端点定位灯（车道 0 已在真实几何上，无需公式偏移）
-      const offPx = e.off ? Math.max(3.5, e.off * S) : 0
-      const P = e.laneShapes && e.laneShapes[arr[0].lane]
-        ? screenShape(e.laneShapes[arr[0].lane], offPx)
-        : polyScreen(e, offPx, 0)
+      // 同车道多灯按 掉头→左转→直走→右转 从左到右排列（符合现实次序）
+      arr.sort((a, b) => (MOV_RANK[a.dir] ?? 9) - (MOV_RANK[b.dir] ?? 9))
+      // 极简模式：每车道仅显示一个方向的灯——从该车道所有方向中按
+      // 优先级 掉头<左转<直行<右转 取最高级（右转最高）；灯径 0.8 车道宽，居车道中线
+      if (minimalLights) {
+        const MIN_RANK = { r: 3, R: 3, s: 2, S: 2, l: 1, L: 1, t: 0, T: 0 }
+        const best = arr.reduce((b, x) =>
+          ((MIN_RANK[x.dir] ?? -1) > (MIN_RANK[b.dir] ?? -1) ? x : b))
+        arr.length = 0
+        arr.push(best)
+      }
+      const P = laneEndPts(e, arr[0].lane)
       let d0 = Math.hypot(P[0][0] - cx, P[0][1] - cy)
       let d1 = Math.hypot(P[P.length - 1][0] - cx, P[P.length - 1][1] - cy)
       const epIdx = d0 <= d1 ? 0 : P.length - 1
@@ -508,25 +735,16 @@ function draw(t) {
       const rl = Math.hypot(rdx, rdy) || 1
       const ux = rdx / rl, uy = rdy / rl
       const px = -uy, py = ux
-      // 灯位：位于道路终点/起点（停车线处，远离路口中心）
-      const back = -4.5 * Math.min(1.4, S)
-      const subGap = Math.max(1.2, 3.6 * Math.min(1.4, S))
-      for (let k = 0; k < arr.length; k++) {
-        const laneOff = (k - (arr.length - 1) / 2) * subGap
-        const lx = ep[0] + ux * back + px * laneOff
-        const ly = ep[1] + uy * back + py * laneOff
-        const col = stateColor(arr[k].char, c)
-        ctx.fillStyle = col
-        ctx.beginPath()
-        ctx.arc(lx, ly, lightR, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.strokeStyle = col
-        ctx.globalAlpha = 0.35
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.arc(lx, ly, lightR + 2.4, 0, Math.PI * 2)
-        ctx.stroke()
-        ctx.globalAlpha = 1
+      // 灯组间距规则：n 颗灯的车道，间距 = 车道宽/(n+1)，两侧各留一个间距
+      // → 灯组落在本车道内（不出界、锚定车道），间距随灯数 n 自适应
+      const n = arr.length
+      const gap = laneSep / (n + 1)
+      lightR = minimalLights ? 0.4 * laneSep : Math.min(6, 0.5 * gap)   // 极简：直径 0.8 车道宽；普通：灯径适配间距（直径≈间距，刚好相切）
+      // 灯位：以本车道真实停车线 ep 为锚点居中，只做组内并排偏移。
+      // 注意不可再叠加车道横向偏移（ep 已含车道位置，叠加会把灯组推到两倍偏移处、越出道路）
+      for (let k = 0; k < n; k++) {
+        const lat = (k - (n - 1) / 2) * gap
+        drawLight(ep[0] + ux * back + px * lat, ep[1] + uy * back + py * lat, arr[k].char, moveAngle(arr[k].dir, ux, uy, px, py), arr[k].dir)
       }
     }
   }
@@ -555,9 +773,9 @@ function draw(t) {
     ctx.fillStyle = col
     ctx.beginPath()
     if (typeof ctx.roundRect === 'function') {
-      ctx.roundRect(-size * 0.7, -size * 0.35, size * 1.4, size * 0.7, size * 0.2)
+      ctx.roundRect(-size * 0.9, -size * 0.35, size * 1.1, size * 0.7, size * 0.2)
     } else {
-      ctx.rect(-size * 0.7, -size * 0.35, size * 1.4, size * 0.7)
+      ctx.rect(-size * 0.9, -size * 0.35, size * 1.1, size * 0.7)
     }
     ctx.fill()
     ctx.restore()
@@ -666,7 +884,7 @@ function onWheel(ev) {
   const rect = el.getBoundingClientRect()
   const mx = ev.clientX - rect.left, my = ev.clientY - rect.top
   const f = ev.deltaY < 0 ? 1.12 : 1 / 1.12
-  const ns = Math.min(400, Math.max(0.005, view.scale * f))
+  const ns = Math.min(400, Math.max(MIN_SCALE, view.scale * f))
   const k = ns / view.scale
   view.tx = mx - (mx - view.tx) * k
   view.ty = my - (my - view.ty) * k
@@ -735,7 +953,10 @@ function vehicleScreenPos(v, k) {
   const y = v.py + (v.y - v.py) * k
   const mx = X(v.x) - X(v.px)
   const my = Y(v.y) - Y(v.py)
-  if (Math.hypot(mx, my) > 1e-6) v.heading = Math.atan2(my, mx)
+  if (Math.hypot(mx, my) > 1e-6) {
+    v.heading = Math.atan2(my, mx)
+    v._hd = 1   // 已由运动方向定过向，后续不再用车道切线覆盖
+  }
   const ang = v.heading ?? 0
   let shift = 0
   if (v.lane) {
@@ -897,7 +1118,14 @@ watch([() => selected.value?.id, () => ui.settings.infoAutoRefresh], () => {
 // ── 生命周期 ──────────────────────────────────────────────
 watch(() => sim.status, (s) => {
   if (s === 'running') { vehicles.clear(); tlsData.clear(); loadNetwork() }
-  if (s === 'idle') { clearNet(); hint.value = '请先启动仿真以加载路网' }
+  if (s === 'idle') {
+    // 仅在确无会话（真正点击停止/后端重启，session_id 为空）时清空路网；
+    // 若瞬时轮询把 status 误置 idle 而会话仍在，保留画布不被误清
+    if (!sim.sessionId) {
+      clearNet()
+      hint.value = '请先启动仿真以加载路网'
+    }
+  }
 })
 onMounted(() => {
   refreshColors()
@@ -910,6 +1138,15 @@ onMounted(() => {
   // 仅在已有运行会话时加载路网；新打开页面一律空白
   //（后端残留会话由 App 挂载时自动停止并清空）
   if (sim.status === 'running') loadNetwork()
+  // 拉取后端场景清单（失败时用内置清单兜底）
+  apiGet('/simulate/scenarios').then((list) => {
+    if (Array.isArray(list) && list.length) {
+      scenarioOptions.value = [
+        { value: '', label: '默认车流' },
+        ...list.map((s) => ({ value: s.id, label: s.label })),
+      ]
+    }
+  }).catch(() => {})
 })
 onBeforeUnmount(() => {
   cancelAnimationFrame(raf)
@@ -946,6 +1183,20 @@ onBeforeUnmount(() => {
     </div>
     <div class="canvas-toolbar">
       <span>{{ ui.testMode ? '测试车辆选路：点击道路加入路线（再点已选边取消）' : '滚轮缩放 · 拖拽平移 · 双击复位 · 点击车辆/道路查看详情' }}</span>
+    </div>
+
+    <!-- 交通场景 + 测试车辆（画布右上角一组） -->
+    <div class="top-right">
+      <select :value="ui.scenario" class="scenario" :disabled="sim.status !== 'idle'"
+        @change="ui.setScenario($event.target.value)"
+        title="交通场景（高峰/平峰/深夜…，启动参数，运行中不可切换）">
+        <option v-for="s in scenarioOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
+      </select>
+      <button class="top-right-btn" :class="{ on: ui.testMode }"
+        @click="ui.setTestMode(!ui.testMode)"
+        title="测试车辆：在画布点击道路选择路线，单车行驶并统计等待">
+        测试车辆
+      </button>
     </div>
 
     <!-- 测试车辆控制面板 -->
@@ -1034,6 +1285,25 @@ onBeforeUnmount(() => {
 .corner-name { font-size: 12px; color: var(--text-1); }
 .corner-file { font-size: 10px; color: var(--text-3); }
 .corner-meta { font-size: 10px; color: var(--text-3); }
+.top-right {
+  position: absolute; top: var(--space-3); right: var(--space-3); z-index: 5;
+  display: flex; align-items: center; gap: 6px;
+}
+.top-right .scenario {
+  height: 28px; padding: 0 8px; max-width: 150px;
+  background: var(--bg-panel); color: var(--text-2);
+  border: 1px solid var(--border); border-radius: var(--radius-ctrl);
+  font-size: 12px; cursor: pointer;
+}
+.top-right .scenario:disabled { opacity: 0.45; cursor: not-allowed; }
+.top-right-btn {
+  height: 28px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-ctrl);
+  background: var(--bg-panel); color: var(--text-2); font-size: 12px;
+  cursor: pointer; transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+.top-right-btn:hover { color: var(--text-1); border-color: var(--border-strong); }
+.top-right-btn.on { background: var(--signal-green-soft); border-color: var(--signal-green); color: var(--signal-green); font-weight: 600; }
 .legend { display: flex; gap: 8px; font-size: 10px; color: var(--text-3); }
 .legend.ev { padding-top: 2px; border-top: 1px dashed var(--border); }
 .lg { display: inline-flex; align-items: center; gap: 4px; }

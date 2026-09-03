@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import TopBar from './components/TopBar.vue'
 import NetCanvas from './components/NetCanvas.vue'
 import AgentPanel from './components/AgentPanel.vue'
@@ -20,6 +20,30 @@ const agent = useAgentStore()
 const metrics = useMetricsStore()
 
 const settingsOpen = ref(false)
+
+// ── 响应式断点：窄屏把侧栏从"固定占宽"切换为"悬浮抽屉"，给画布让出整屏 ──
+const compact = ref(false)   // ≤1100px：右栏（AI 助手）变抽屉
+const narrow = ref(false)    // ≤820px：左栏也变抽屉
+const rightOpen = ref(true)
+const leftOpen = ref(true)
+let resizeRaf = null
+function updateBp() {
+  const W = window.innerWidth
+  const wasCompact = compact.value
+  const wasNarrow = narrow.value
+  compact.value = W <= 1100
+  narrow.value = W <= 820
+  // 刚跨入断点时默认收起对应抽屉，画布立即获得整屏
+  if (!wasCompact && compact.value) rightOpen.value = false
+  if (!wasNarrow && narrow.value) leftOpen.value = false
+  ui.reclampLayout()
+}
+function onResize() {
+  if (resizeRaf) return
+  resizeRaf = requestAnimationFrame(() => { resizeRaf = null; updateBp() })
+}
+const leftStyle = computed(() => narrow.value ? { width: 'min(320px, 86vw)' } : { width: ui.leftW + 'px' })
+const rightStyle = computed(() => compact.value ? { width: 'min(360px, 88vw)' } : { width: ui.rightW + 'px' })
 
 // ── 左栏单栏切换模式（tabs）：一次只显示一个子栏 ────────────
 const LEFT_TABS = [
@@ -56,11 +80,16 @@ onMounted(async () => {
     try { await sim.stop(); metrics.resetSession() } catch { sim.status = 'idle'; sim.sessionId = null; metrics.resetSession() }
   }
 
+  updateBp()
+  window.addEventListener('resize', onResize)
   timers.push(setInterval(() => sim.refreshStatus(), 3000))
   timers.push(setInterval(() => { if (sim.status !== 'idle') metrics.refresh() }, 5000))
   timers.push(setInterval(() => { if (ui.viewMode === 'pro' && sim.status !== 'idle') metrics.loadHistory('avg_speed') }, 15000))
 })
-onBeforeUnmount(() => timers.forEach(clearInterval))
+onBeforeUnmount(() => {
+  timers.forEach(clearInterval)
+  window.removeEventListener('resize', onResize)
+})
 
 // ── 面板拖拽调整（左右栏宽 / 上下区高） ─────────────────────
 // 关键：拖拽开始时快照各面板初始值，位移从快照计算——
@@ -101,26 +130,33 @@ function onDragEnd() {
   window.removeEventListener('mouseup', onDragEnd)
 }
 function resetPanel(kind) {
-  if (kind === 'left') ui.setLeftW(300)
-  else if (kind === 'right') ui.setRightW(380)
-  else if (kind === 'bottom') ui.setBottomH(240)
-  else if (kind === 'metrics') ui.setMetricsH(210)
-  else if (kind === 'scheme') ui.setSchemeH(330)
+  ui.resetPanel(kind)
 }
 
-function handleStart({ net, routes, addFiles, scheme }) {
+function handleStart({ net, routes, addFiles, scheme, scenario }) {
   sim.start({
     netPath: net.net_path,
     routes,
     addFiles,
     scheme: scheme || 'scheme_2',
     schemeParams: { mode: 'auto', mappo_weights: 'models/weights/mappo_act_full' },
+    rightTurnGreen: !!ui.settings.rightTurnGreen,
+    scenario: scenario || '',
   }).catch((e) => console.warn('[start] 启动失败:', e.message))
 }
 function handleStop() { sim.stop().then(() => metrics.resetSession()).catch(() => {}) }
 function handlePause() { sim.pause().catch(() => {}) }
 function handleResume() { sim.resume().catch(() => {}) }
 function handleSpeed(v) { sim.setSpeed(v).catch(() => {}) }
+
+// ── 右转常绿：运行中实时生效 ────────────────────────────────
+// 启动时已由 start 请求带 right_turn_green 应用；运行中再切换开关时，
+// 直接调后端实时应用/还原（无需重启仿真）。用 immediate:true 兜底同步。
+watch(() => ui.settings.rightTurnGreen, (on) => {
+  if (sim.status === 'running' || sim.status === 'paused') {
+    sim.setRightTurnGreen(on).catch(() => {})
+  }
+})
 </script>
 
 <template>
@@ -129,12 +165,16 @@ function handleSpeed(v) { sim.setSpeed(v).catch(() => {}) }
       :busy="sim.starting"
       @start="handleStart" @stop="handleStop" @pause="handlePause" @resume="handleResume"
       @speed="handleSpeed"
-      @toggle-theme="ui.toggleTheme" @toggle-view="ui.setViewMode(ui.viewMode === 'pro' ? 'normal' : 'pro')"
+      @toggle-view="ui.setViewMode(ui.viewMode === 'pro' ? 'normal' : 'pro')"
       @open-settings="settingsOpen = true"
     />
 
-    <main class="layout">
-      <aside class="left" :style="{ width: ui.leftW + 'px' }">
+    <main class="layout" :class="{ compact, narrow }">
+      <aside class="left" :class="{ drawer: narrow, open: leftOpen }" :style="leftStyle">
+        <div v-if="narrow" class="drawer-head">
+          <span>侧边栏</span>
+          <button class="drawer-close" title="收起侧边栏" @click="leftOpen = false">×</button>
+        </div>
         <!-- 模式一：堆叠（默认）——三个子栏同时显示 -->
         <template v-if="ui.settings.leftMode === 'stacked'">
           <MetricsPanel :style="{ height: ui.metricsH + 'px' }" />
@@ -161,17 +201,25 @@ function handleSpeed(v) { sim.setSpeed(v).catch(() => {}) }
         </template>
       </aside>
 
-      <div class="v-handle" title="拖拽调整左栏宽度（双击复位）"
+      <div class="v-handle" :class="{ hidden: narrow }" title="拖拽调整左栏宽度（双击复位）"
         @mousedown="startDrag('left', $event)" @dblclick="resetPanel('left')" />
 
       <NetCanvas class="center" />
 
-      <div class="v-handle" title="拖拽调整右栏宽度（双击复位）"
+      <div class="v-handle" :class="{ hidden: compact }" title="拖拽调整右栏宽度（双击复位）"
         @mousedown="startDrag('right', $event)" @dblclick="resetPanel('right')" />
 
-      <aside class="right" :style="{ width: ui.rightW + 'px' }">
+      <aside class="right" :class="{ drawer: compact, open: rightOpen }" :style="rightStyle">
+        <div v-if="compact" class="drawer-head">
+          <span>AI 助手</span>
+          <button class="drawer-close" title="收起 AI 助手" @click="rightOpen = false">×</button>
+        </div>
         <AgentPanel />
       </aside>
+
+      <!-- 抽屉关闭时的侧缘开合标签 -->
+      <button v-if="narrow && !leftOpen" class="drawer-tab left" title="打开侧边栏" @click="leftOpen = true">›</button>
+      <button v-if="compact && !rightOpen" class="drawer-tab right" title="打开 AI 助手" @click="rightOpen = true">‹</button>
     </main>
 
     <template v-if="ui.viewMode === 'pro'">
@@ -186,7 +234,7 @@ function handleSpeed(v) { sim.setSpeed(v).catch(() => {}) }
 
 <style scoped>
 .shell { display: flex; flex-direction: column; height: 100%; }
-.layout { flex: 1; min-height: 0; display: flex; }
+.layout { flex: 1; min-height: 0; display: flex; position: relative; }
 .left {
   display: flex; flex-direction: column; gap: var(--space-3);
   padding: var(--space-3); overflow: hidden;
@@ -205,6 +253,43 @@ function handleSpeed(v) { sim.setSpeed(v).catch(() => {}) }
 .ltab.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .center { flex: 1; min-width: 0; }
 .right { padding: var(--space-3); overflow: hidden; }
+
+/* ── 响应式：窄屏侧栏切换为悬浮抽屉（覆盖在画布上，开合有过渡） ── */
+.layout.compact .right,
+.layout.narrow .left {
+  position: absolute; top: 0; bottom: 0; z-index: 20;
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow-2);
+  transition: transform var(--dur-med) var(--ease-out);
+}
+.layout.narrow .left { left: 0; transform: translateX(-100%); }
+.layout.narrow .left.open { transform: translateX(0); }
+.layout.compact .right { right: 0; transform: translateX(100%); }
+.layout.compact .right.open { transform: translateX(0); }
+.v-handle.hidden { display: none; }
+.drawer-head {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  height: 32px; padding: 0 var(--space-2);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: var(--text-2);
+}
+.drawer-close {
+  width: 24px; height: 24px; border: 1px solid var(--border);
+  border-radius: var(--radius-ctrl); background: var(--bg-elev);
+  color: var(--text-2); cursor: pointer; font-size: 14px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.drawer-close:hover { color: var(--accent); border-color: var(--accent); }
+.drawer-tab {
+  position: absolute; z-index: 15; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 60px; border: 1px solid var(--border-strong);
+  background: var(--bg-panel); color: var(--text-2); cursor: pointer;
+  font-size: 14px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-ctrl);
+}
+.drawer-tab:hover { color: var(--accent); border-color: var(--accent); }
+.drawer-tab.left { left: 0; }
+.drawer-tab.right { right: 0; }
 
 /* 拖拽手柄 */
 .v-handle {
