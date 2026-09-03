@@ -753,7 +753,9 @@ function draw(t) {
   // 4) 车辆：速度着色（停驶红 → 缓行琥珀 → 畅通绿），特殊类型用类型色
   //    朝向由屏幕空间位移方向计算（沿实际行驶方向），不依赖 SUMO angle
   const now = performance.now()
-  if (ui.settings.showVehicles) {
+  // 路网几何(edges/fitView)就绪前不画车辆：首批车可能先于 /network 返回到达，
+  // 若在未定位的视口(原点 0,0、负坐标路网尤其明显)绘制会出现"出界/方向错"的闪现
+  if (ui.settings.showVehicles && edges.value.length && bounds) {
   for (const v of vehicles.values()) {
     const k = Math.min(1, Math.max(0, (now - v.t0) / stepMs))
     const p = vehicleScreenPos(v, k)
@@ -780,7 +782,7 @@ function draw(t) {
     ctx.fill()
     ctx.restore()
   }
-  } // end showVehicles
+  } // end 几何就绪 gate（含 showVehicles）
 
   // 6) 选中高亮：车辆路线（虚线）/ 选中边 / 选中车辆描环
   if (selected.value) {

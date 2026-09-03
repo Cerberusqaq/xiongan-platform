@@ -13,7 +13,7 @@ const ui = useUiStore()
 
 const speed = ref(1)
 const selected = ref('')
-const scheme = ref('scheme_2')
+const scheme = ref('webster')   // 默认：案例 Webster 最优配时（demo 路口自动按流量算；无流量则等于固定配时基线）
 const fileInput = ref(null)
 
 // 路网下拉：中文名 + 悬停预览
@@ -29,6 +29,7 @@ watch(ddOpen, (open) => { if (!open) { hoverName.value = ''; hoverSvg.value = ''
 const currentNet = computed(() => sim.nets.find((n) => n.net_path === selected.value))
 
 const SCHEMES = [
+  { value: 'webster', label: '默认方案 · Webster 最优配时' },
   { value: 'scheme_1', label: '方案一 · 固定配时+绿波' },
   { value: 'scheme_2', label: '方案二 · MAPPO/SCOOT' },
   { value: 'scheme_3', label: '方案三 · 车端引导' },

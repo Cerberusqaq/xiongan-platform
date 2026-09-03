@@ -507,6 +507,14 @@ class Engine:
         except traci.TraCIException as exc:
             raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
 
+    def set_tls_phase_duration(self, tls_id: str, duration: float) -> None:
+        """改写当前相位剩余时长（不跳相位；Webster 配时逐相位生效用）。"""
+        self._require_connected()
+        try:
+            traci.trafficlight.setPhaseDuration(tls_id, float(duration))
+        except traci.TraCIException as exc:
+            raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
+
     def set_tls_program(self, tls_id: str, program_id: str) -> None:
         self._require_connected()
         try:
