@@ -20,10 +20,10 @@ _NET_LABELS = {
     "eval/eval_grid9": "随机网格 · 9 路口",
     "eval/eval_grid25": "随机网格 · 25 路口",
     "eval/eval_spider13": "蜘蛛网 · 13 路口",
-    "intersections/demo_1": "案例路口1 · 十字+转向（6相位）",
-    "intersections/demo_2": "案例路口2 · T形路口（4相位）",
-    "intersections/demo_3": "案例路口3 · 十字路口（4相位）",
-    "intersections/demo_4": "案例路口4 · 十字路口（4相位）",
+    "demo_1": "案例路口1 · 十字+转向（6相位）",
+    "demo_2": "案例路口2 · T形路口（4相位）",
+    "demo_3": "案例路口3 · 十字路口（4相位）",
+    "demo_4": "案例路口4 · 十字路口（4相位）",
 }
 
 
@@ -340,6 +340,8 @@ class AppRuntime:
         net_dirs = [
             os.path.join(os.path.dirname(backend_dir), "networks", "network"),
             os.path.join(backend_dir, "data", "networks"),
+            # 主目录下的单路口案例集（demo_1..4，交付可见）
+            os.path.join(os.path.dirname(backend_dir), "intersection_cases"),
         ]
         out: list[dict] = []
         seen: set[str] = set()
