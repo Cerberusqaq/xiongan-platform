@@ -139,7 +139,7 @@ function handleStart({ net, routes, addFiles, scheme, scenario }) {
     routes,
     addFiles,
     scheme: scheme || 'scheme_2',
-    schemeParams: { mode: 'auto', mappo_weights: 'models/weights/mappo_act_full' },
+    schemeParams: { mode: 'auto', obs_mode: 'agnostic', mappo_weights: 'models/weights/mappo_agnostic_full' },
     rightTurnGreen: !!ui.settings.rightTurnGreen,
     scenario: scenario || '',
   }).catch((e) => console.warn('[start] 启动失败:', e.message))

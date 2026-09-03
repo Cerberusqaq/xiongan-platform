@@ -38,8 +38,12 @@ class Engine:
                 add_files: list[str] | None = None, begin: int = 0,
                 end: int = 86400, step_length: float = 1.0) -> None:
         sumo_home = os.environ.get("SUMO_HOME", "")
-        sumo_bin = os.path.join(sumo_home, "bin", "sumo.exe") if sumo_home else "sumo"
-        if not os.path.exists(sumo_bin):
+        # 跨平台：Windows 用 <SUMO_HOME>/bin/sumo.exe；Linux/mac 直接用 PATH 中的 sumo
+        if os.name == "nt":
+            sumo_bin = os.path.join(sumo_home, "bin", "sumo.exe") if sumo_home else "sumo"
+            if not os.path.exists(sumo_bin):
+                sumo_bin = "sumo"
+        else:
             sumo_bin = "sumo"
         cmd = [sumo_bin, "-n", net_file, "-b", str(begin), "-e", str(end),
                "--step-length", str(step_length), "--no-step-log", "--quit-on-end"]
