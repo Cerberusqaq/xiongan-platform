@@ -29,7 +29,7 @@ watch(ddOpen, (open) => { if (!open) { hoverName.value = ''; hoverSvg.value = ''
 const currentNet = computed(() => sim.nets.find((n) => n.net_path === selected.value))
 
 const SCHEMES = [
-  { value: 'webster', label: '默认方案 · Webster 最优配时' },
+  { value: 'webster', label: '默认方案 · Webster 最优配时', demo: true },
   { value: 'scheme_1', label: '方案一 · 固定配时+绿波' },
   { value: 'scheme_2', label: '方案二 · MAPPO/SCOOT' },
   { value: 'scheme_3', label: '方案三 · 车端引导' },
@@ -37,6 +37,18 @@ const SCHEMES = [
 ]
 
 const netOptions = computed(() => sim.nets)
+
+// 默认方案(webster)仅对 demo 单路口案例可用；其它路网隐藏并在已选中时回退
+const isDemoNet = computed(() => {
+  const p = sim.nets.find((n) => n.net_path === selected.value)?.net_path || ''
+  return /intersection_cases|(^|[/\\])demo_\d/.test(p)
+})
+const schemeOptions = computed(() => isDemoNet.value
+  ? SCHEMES
+  : SCHEMES.filter((s) => !s.demo))
+watch(isDemoNet, (demo) => {
+  if (!demo && scheme.value === 'webster') scheme.value = 'scheme_2'
+}, { immediate: true })
 
 const statusMeta = computed(() => ({
   running: { label: '运行中', cls: 'run' },
@@ -106,7 +118,7 @@ async function onUpload(ev) {
       <AppButton @click="fileInput.click()" title="上传 SUMO 路网文件（.net.xml + .rou.xml + .add.xml）">上传路网</AppButton>
       <input ref="fileInput" type="file" multiple accept=".xml" hidden @change="onUpload" />
       <select v-model="scheme" class="ctrl" :disabled="sim.status !== 'idle'" title="控制方案">
-        <option v-for="s in SCHEMES" :key="s.value" :value="s.value">{{ s.label }}</option>
+        <option v-for="s in schemeOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
       </select>
       <AppButton variant="primary" class="ic-btn" :disabled="!selected || sim.status !== 'idle' || busy"
         @click="onStart" :title="busy ? '启动中…' : '启动仿真'">
