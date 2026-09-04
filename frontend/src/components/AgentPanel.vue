@@ -15,10 +15,29 @@ const input = ref('')
 const toolsOpen = ref(false)
 onMounted(() => { agent.fetchTools(); rollSuggestion() })
 
-// ── 建议指令：预存一批备用，界面随机抽一条，可一键发送或换一条 ──
+// ── 建议指令：预存一批备用，界面随机抽一条，可一键发送 / 复制编辑 / 换一条 ──
+// 预设项支持两种形态：字符串（固定文本）或 () => 文本（每次生成都会刷新，如路径规划随机起终点）。
+function pickRandomEdges(n = 2) {
+  // 从当前真实加载的路网中随机抽取 n 条互不相同的道路 id
+  const es = (sim.currentEdges || [])
+    .filter((e) => typeof e === 'string' && e && !e.includes(':'))
+  const pool = es.length >= n ? es : ['E21_1', 'E9_19']   // 边未就绪时回退演示默认边
+  const out = []
+  const guard = new Set()
+  let tries = 0
+  while (out.length < n && tries++ < 60) {
+    const e = pool[Math.floor(Math.random() * pool.length)]
+    if (!guard.has(e)) { guard.add(e); out.push(e) }
+  }
+  while (out.length < n) out.push(pool[(out.length - 1) % pool.length])
+  return out
+}
 const QUICK_PRESETS = [
   '检测到东侧突发车流，请分析现状并执行应急调控',
-  '我想从 E21_1 去 E9_19，请规划最优路径并给出驾驶建议',
+  () => {                                  // 路径规划：每次生成都随机起终点
+    const [a, b] = pickRandomEdges(2)
+    return `我想从 ${a} 去 ${b}，请规划最优路径并给出驾驶建议`
+  },
   '请巡检全局路网，找出拥堵区域并给出协调建议',
   '东侧拥堵，请调整最长绿灯并对比前后效果',
   '把最长绿灯调到 60 秒并对比前后指标',
@@ -34,11 +53,18 @@ const QUICK_PRESETS = [
   '请把控制方案换到方案一并对比一段运行效果',
 ]
 const suggestion = ref('')
+let lastQuickIdx = -1
+function presetText(p) {
+  return typeof p === 'function' ? p() : p
+}
 function rollSuggestion() {
-  const pool = QUICK_PRESETS.filter((p) => p !== suggestion.value)
-  suggestion.value = pool.length
-    ? pool[Math.floor(Math.random() * pool.length)]
-    : QUICK_PRESETS[0]
+  const n = QUICK_PRESETS.length
+  if (!n) return
+  let idx = lastQuickIdx
+  if (n > 1) while (idx === lastQuickIdx) idx = Math.floor(Math.random() * n)
+  else idx = 0
+  lastQuickIdx = idx
+  suggestion.value = presetText(QUICK_PRESETS[idx])
 }
 async function sendQuick() {
   if (!suggestion.value || agent.thinking) return
@@ -46,6 +72,13 @@ async function sendQuick() {
   rollSuggestion()          // 发送后自动换一条，供连续提问
 }
 function clearSuggestion() { suggestion.value = '' }
+/** 一键把当前建议指令复制到输入框，便于手动修改后再发送 */
+function copyToInput() {
+  if (!suggestion.value) return
+  input.value = suggestion.value
+  clearSuggestion()
+  pulseInput()
+}
 
 // LLM 模型切换（可选免费模型，运行时生效）
 const selModel = ref('')
@@ -198,6 +231,7 @@ async function send(text = input.value) {
         <span class="quick-label">建议指令</span>
         <span class="quick-text">{{ suggestion }}</span>
         <button class="q-btn go" :disabled="agent.thinking" @click="sendQuick()">发送</button>
+        <button class="q-btn" title="把该指令复制到输入框，可手动修改后再发送" @click="copyToInput()">复制编辑</button>
         <button class="q-btn" title="换一条指令" @click="rollSuggestion">换一条</button>
         <button class="q-btn x" title="关闭建议，自行输入" @click="clearSuggestion">×</button>
       </div>

@@ -29,8 +29,17 @@ def _validate_params(specs: list[ParamSpec], params: dict) -> tuple[dict, str | 
             if p.maximum is not None and v > p.maximum:
                 return {}, f"参数 {p.label} 超过上限 {p.maximum}"
         elif p.type == "enum":
-            if p.enum and v not in p.enum:
-                return {}, f"参数 {p.label} 不在允许范围 {p.enum}"
+            if p.enum:
+                if isinstance(v, str):
+                    # 容错：忽略大小写与首尾空格（LLM 常把 SCOOT/MAPPO 写成大写）
+                    key = v.strip().lower()
+                    hit = next((e for e in p.enum
+                                if str(e).strip().lower() == key), None)
+                    if hit is None:
+                        return {}, f"参数 {p.label} 不在允许范围 {p.enum}"
+                    v = hit
+                elif v not in p.enum:
+                    return {}, f"参数 {p.label} 不在允许范围 {p.enum}"
         elif p.type == "bool":
             v = bool(v)
         else:

@@ -459,6 +459,14 @@ class Scheme2Controller(BaseScheme):
     # ── API 动作 ────────────────────────────────────────────
 
     def handle_action(self, action: str, params: dict) -> dict:
+        # 标准化能力名 switch_mode → 内部 switch_to_*（mode 忽略大小写）
+        if action == "switch_mode":
+            mode = str(params.get("mode", "auto") or "auto").strip().lower()
+            if mode == "mappo":
+                return self.handle_action("switch_to_mappo", {})
+            if mode == "scoot":
+                return self.handle_action("switch_to_scoot", {})
+            return self.handle_action("switch_to_auto", {})
         if action == "switch_to_mappo":
             if not self.torch_ok:
                 return {"ok": False, "message": "无 PyTorch，无法切换 MAPPO"}

@@ -113,8 +113,17 @@ def _safe_params(schema, args):
     out = {}
     for k, v in (args or {}).items():
         spec = props.get(k, {})
-        if spec.get("enum") and v not in spec["enum"]:
-            return None, f"参数 {k}={v} 不在允许范围 {spec['enum']}"
+        if spec.get("enum"):
+            if isinstance(v, str):
+                # 容错：忽略大小写与首尾空格（LLM 常把 SCOOT/MAPPO 写成大写）
+                key = v.strip().lower()
+                hit = next((e for e in spec["enum"]
+                            if str(e).strip().lower() == key), None)
+                if hit is None:
+                    return None, f"参数 {k}={v} 不在允许范围 {spec['enum']}"
+                v = hit
+            elif v not in spec["enum"]:
+                return None, f"参数 {k}={v} 不在允许范围 {spec['enum']}"
         lo, hi = spec.get("minimum"), spec.get("maximum")
         if isinstance(v, (int, float)) and lo is not None and v < lo:
             return None, f"参数 {k}={v} 低于下限 {lo}"
