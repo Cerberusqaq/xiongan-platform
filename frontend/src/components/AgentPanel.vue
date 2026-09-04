@@ -13,7 +13,39 @@ const input = ref('')
 
 // 工具详情弹窗
 const toolsOpen = ref(false)
-onMounted(() => { agent.fetchTools() })
+onMounted(() => { agent.fetchTools(); rollSuggestion() })
+
+// ── 建议指令：预存一批备用，界面随机抽一条，可一键发送或换一条 ──
+const QUICK_PRESETS = [
+  '检测到东侧突发车流，请分析现状并执行应急调控',
+  '我想从 E21_1 去 E9_19，请规划最优路径并给出驾驶建议',
+  '请巡检全局路网，找出拥堵区域并给出协调建议',
+  '东侧拥堵，请调整最长绿灯并对比前后效果',
+  '把最长绿灯调到 60 秒并对比前后指标',
+  '请查看当前最堵塞的道路和路口，给出处理建议',
+  '在 E12_8 附近注入一场事故，评估对路网的影响',
+  '请切换方案二到 SCOOT 模式并说明原因',
+  '请开启右转常绿并检查运行效果',
+  '请生成一份当前路网态势报告',
+  '请对比调控前后的指标并总结效果',
+  '怎样提高当前路网的吞吐能力？',
+  '有没有长时间饿死的进口方向？请给出保底方案',
+  '请分析高峰期的瓶颈并给出配时优化建议',
+  '请把控制方案换到方案一并对比一段运行效果',
+]
+const suggestion = ref('')
+function rollSuggestion() {
+  const pool = QUICK_PRESETS.filter((p) => p !== suggestion.value)
+  suggestion.value = pool.length
+    ? pool[Math.floor(Math.random() * pool.length)]
+    : QUICK_PRESETS[0]
+}
+async function sendQuick() {
+  if (!suggestion.value || agent.thinking) return
+  await send(suggestion.value)
+  rollSuggestion()          // 发送后自动换一条，供连续提问
+}
+function clearSuggestion() { suggestion.value = '' }
 
 // LLM 模型切换（可选免费模型，运行时生效）
 const selModel = ref('')
@@ -162,6 +194,14 @@ async function send(text = input.value) {
       </div>
     </div>
 
+      <div v-if="suggestion" class="quick">
+        <span class="quick-label">建议指令</span>
+        <span class="quick-text">{{ suggestion }}</span>
+        <button class="q-btn go" :disabled="agent.thinking" @click="sendQuick()">发送</button>
+        <button class="q-btn" title="换一条指令" @click="rollSuggestion">换一条</button>
+        <button class="q-btn x" title="关闭建议，自行输入" @click="clearSuggestion">×</button>
+      </div>
+
       <div class="input-row">
         <input
           ref="inputEl" v-model="input" class="input mono"
@@ -298,6 +338,26 @@ async function send(text = input.value) {
   background: var(--accent-soft); color: var(--accent); font-size: 11px; cursor: pointer; white-space: nowrap;
 }
 .tmpl-send:hover { background: var(--accent); color: oklch(0.16 0.01 80); }
+.quick {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 8px;
+  border: 1px dashed oklch(0.95 0.2 100 / 0.5);
+  border-radius: var(--radius-ctrl);
+  background: oklch(0.95 0.2 100 / 0.06);
+  font-size: 11px;
+}
+.quick-label { color: var(--accent); font-weight: 600; flex: 0 0 auto; }
+.quick-text { flex: 1 1 140px; min-width: 0; color: var(--text-1); line-height: 1.5; }
+.q-btn {
+  flex: 0 0 auto; height: 20px; padding: 0 8px; white-space: nowrap;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-ctrl);
+  background: var(--bg-elev); color: var(--text-2); font-size: 10px; cursor: pointer;
+}
+.q-btn:hover { border-color: var(--accent); color: var(--accent); }
+.q-btn.go { border-color: var(--light-yellow); color: var(--light-yellow); }
+.q-btn.go:disabled { opacity: 0.5; cursor: wait; }
+.q-btn.x { border: none; background: none; color: var(--text-3); padding: 0 4px; font-size: 13px; }
+.q-btn.x:hover { color: var(--signal-red); }
 .input-row { display: flex; gap: var(--space-2); }
 .input {
   flex: 1; min-width: 0; height: 32px; padding: 0 10px;
