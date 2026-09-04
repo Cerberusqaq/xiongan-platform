@@ -31,6 +31,22 @@ async function onResetMemory() {
   await agent.resetMemory()
 }
 
+// 评委引导：点击面板空白处 → 输入框黄光脉冲提示（评审体验优化）
+const inputEl = ref(null)
+function onAgentAreaTap(ev) {
+  if (ev.target.closest('input, select, textarea, button, .tmpl-send, .msg, a, details, summary')) return
+  pulseInput()
+}
+function pulseInput() {
+  const el = inputEl.value
+  if (!el) return
+  el.classList.remove('pulse')
+  void el.offsetWidth            // 重启动画
+  el.classList.add('pulse')
+  el.focus({ preventScroll: true })
+  setTimeout(() => el.classList.remove('pulse'), 1200)
+}
+
 function argSummary(args) {
   if (!args || !Object.keys(args).length) return ''
   const s = JSON.stringify(args, null, 0)
@@ -83,7 +99,7 @@ async function send(text = input.value) {
 </script>
 
 <template>
-  <PanelCard title="Traffic Copilot · 智能体" class="agent-panel">
+  <PanelCard title="Traffic Copilot · 智能体" class="agent-panel" @click="onAgentAreaTap">
     <template #extra>
       <button class="tools-btn" @click="toolsOpen = true" title="查看 Agent 可用的全部技能（工具）">
         工具详情
@@ -148,8 +164,8 @@ async function send(text = input.value) {
 
       <div class="input-row">
         <input
-          v-model="input" class="input mono"
-          placeholder="自定义指令，回车发送…"
+          ref="inputEl" v-model="input" class="input mono"
+          placeholder="在这里输入指令，如：东侧拥堵请调整最长绿灯（回车发送）…"
           @keyup.enter="send()"
         />
         <AppButton variant="primary" :disabled="agent.thinking" @click="send()">发送</AppButton>
@@ -284,12 +300,23 @@ async function send(text = input.value) {
 .tmpl-send:hover { background: var(--accent); color: oklch(0.16 0.01 80); }
 .input-row { display: flex; gap: var(--space-2); }
 .input {
-  flex: 1; min-width: 0; height: 30px; padding: 0 10px;
+  flex: 1; min-width: 0; height: 32px; padding: 0 10px;
   background: var(--bg-elev); color: var(--text-1);
-  border: 1px solid var(--border); border-radius: var(--radius-ctrl);
+  border: 1px solid oklch(0.95 0.2 100 / 0.45);   /* 评委引导：默认黄色描边 */
+  border-radius: var(--radius-ctrl);
   font-size: 12px; outline: none;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
-.input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.input:hover { border-color: var(--light-yellow); }
+.input:focus { border-color: var(--light-yellow); box-shadow: 0 0 0 2px oklch(0.95 0.2 100 / 0.25); }
+/* 点击面板空白时输入框黄光脉冲提示 */
+.input.pulse {
+  animation: inputPulse 0.5s ease-in-out 2;
+}
+@keyframes inputPulse {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 3px oklch(0.95 0.2 100 / 0.55); border-color: var(--light-yellow); }
+}
 
 /* 工具详情按钮（标题栏右侧） */
 .tools-btn {

@@ -11,10 +11,18 @@ const emit = defineEmits(['start', 'stop', 'pause', 'resume', 'speed', 'toggle-v
 const sim = useSimStore()
 const ui = useUiStore()
 
-const speed = ref(1)
+const speed = ref(5)      // 默认 5×：评委/演示更快看到车流动
 const selected = ref('')
 const scheme = ref('webster')   // 默认：案例 Webster 最优配时（demo 路口自动按流量算；无流量则等于固定配时基线）
 const fileInput = ref(null)
+
+// 评委开箱即用：路网列表就绪后默认选中 base_network（用户可随时换）
+watch(() => sim.nets.length, (n) => {
+  if (n && !selected.value) {
+    const b = sim.nets.find((x) => x.name === 'base_network')
+    if (b) selected.value = b.net_path
+  }
+})
 
 // 路网下拉：中文名 + 悬停预览
 const ddOpen = ref(false)

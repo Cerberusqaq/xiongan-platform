@@ -57,7 +57,7 @@ cd backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 cd frontend && npm run dev            :: 访问 http://localhost:5173
 ```
 
-## 四、Docker 运行（换新电脑最快）
+## 四、Docker 运行
 
 ```bash
 docker compose up -d --build    # 构建并启动（首次较慢：torch 等依赖）
@@ -79,7 +79,7 @@ LLM_API_KEY=你的智谱密钥
 ```
 也可在平台智能体栏"LLM 模型"下拉随时切换（免重启）。
 
-### 5.2 典型演示流程（3 分钟跑通）
+### 5.2 典型演示流程
 1. 选择路网 `base_network`（多路口协同）或 `案例路口 demo_1~4`（单路口，顶部下拉直接可选）；
 2. 右上角场景：四档峰期 + **区域热点（热点区饱和外溢、外围畅通，算法疏通的价值场景）**；方案默认 Webster（demo 路口自动按流量配时）；
 3. 方案下拉：`webster`（仅 demo 显示）/ 方案一 / 方案二 MAPPO·SCOOT / 方案三 / 基线；多路口建议 `scheme_2`；
@@ -102,7 +102,6 @@ LLM_API_KEY=你的智谱密钥
 | 实验评估报告.md | 对比实验、图表、**AI 训练与验证方法（附录）** | 提交③ |
 | 接口文档.md | REST/WS 全端点、错误码、OpenAPI 导入、云-边-端架构与消息（§15） | 功能一·任务1 |
 | 四典型路口最优调度方案.md | 单路口案例最优配时与验证 | 功能一·任务2 |
-| 演示方案.md | 实际场景演示脚本 | 提交④ |
 | pdf/ | 各报告的 PDF 导出 | 提交 |
 
 ## 七、常见问题
@@ -126,4 +125,3 @@ LLM_API_KEY=你的智谱密钥
 报告：matplotlib + python-docx + reportlab（md/docx/pdf）
 
 ---
-*车路云协同管控平台 · XH-202613 · 仅供学习与竞赛演示使用*

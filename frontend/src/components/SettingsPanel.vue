@@ -25,6 +25,7 @@ const SWITCHES = [
   { key: 'showEvalCharts', label: '显示离线评估图表', desc: '底部离线评估柱状图与方案对比表格（默认关闭）' },
   { key: 'rightTurnGreen', label: '右转常绿', desc: '右转信号恒为绿灯（运行中切换立即生效，不改相位结构，三方案均兼容）' },
   { key: 'hideRightTurnLights', label: '隐藏右转灯', desc: '右转常绿时，画布上不再绘制右转灯头（需先开启右转常绿）' },
+  { key: 'showTurnLights', label: '显示左转/掉头灯', desc: '默认关闭（画面更简洁，仅直行主信号）；打开后绘制左转/掉头箭头灯' },
   { key: 'minimalLights', label: '极简模式', desc: '每条车道仅显示一个方向的信号灯（按 掉头<左转<直行<右转 取最高级，需信号灯样式为无框箭头）' },
 ]
 

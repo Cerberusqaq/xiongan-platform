@@ -86,9 +86,18 @@ function refreshColors() {
     node: v('--net-node'), text3: v('--text-3'), border: v('--border'),
     borderStrong: v('--border-strong'), green: v('--signal-green'), red: v('--signal-red'),
     accent: v('--accent'), greenSoft: v('--signal-green-soft'), redSoft: v('--signal-red-soft'),
+    // 信号灯专用（红半透明 / 荧光黄 / 高亮绿）
+    lgRed: v('--light-red'), lgYellow: v('--light-yellow'), lgGreen: v('--light-green'),
   }
 }
 watch(() => ui.theme, refreshColors)
+
+/** 信号灯状态色：红半透明、黄荧光、绿高亮（评审视觉优化；不影响车辆/文字语义色） */
+function lightCol(ch) {
+  if (/[Gg]/.test(ch)) return colors.value.lgGreen
+  if (/[yY]/.test(ch)) return colors.value.lgYellow
+  return colors.value.lgRed
+}
 
 // ── 路网加载 ──────────────────────────────────────────────
 /** 清空画布全部状态（停止/无路网时调用，避免残留旧路网图形） */
@@ -576,18 +585,18 @@ function draw(t) {
   }
   // 绘制单个灯头。模式：solid 实心圆 | framed 圆框箭头（深色外壳+方向箭头）| bare 无框箭头
   const drawLight = (lx, ly, ch, ang, dir) => {
-    const col = stateColor(ch, c)
+    const col = lightCol(ch)          // 灯专用色：红半透明/黄荧光/绿高亮
     const mode = ui.settings.lightMode || 'framed'
     const s = lightR * 0.85
     if (mode === 'solid') {
-      // 实心圆：状态色实心圆 + 弱光晕
+      // 实心圆：状态色实心圆 + 加粗状态色光晕
       ctx.fillStyle = col
       ctx.beginPath()
       ctx.arc(lx, ly, lightR, 0, Math.PI * 2)
       ctx.fill()
       ctx.strokeStyle = col
-      ctx.globalAlpha = 0.35
-      ctx.lineWidth = 1
+      ctx.globalAlpha = 0.55
+      ctx.lineWidth = 2
       ctx.beginPath()
       ctx.arc(lx, ly, lightR + 2.4, 0, Math.PI * 2)
       ctx.stroke()
@@ -600,9 +609,9 @@ function draw(t) {
       ctx.beginPath()
       ctx.arc(lx, ly, lightR, 0, Math.PI * 2)
       ctx.fill()
-      ctx.strokeStyle = col                     // 状态色光晕
-      ctx.globalAlpha = 0.5
-      ctx.lineWidth = 1
+      ctx.strokeStyle = col                     // 状态色光晕（加粗）
+      ctx.globalAlpha = 0.6
+      ctx.lineWidth = 2
       ctx.beginPath()
       ctx.arc(lx, ly, lightR + 2.4, 0, Math.PI * 2)
       ctx.stroke()
@@ -652,12 +661,14 @@ function draw(t) {
       const byEdge = new Map()
       for (let i = 0; i < links.length && i < st.length; i++) {
         const lk = links[i]
-        if (ui.settings.hideRightTurnLights && (lk.dir === 'r' || lk.dir === 'R')) continue
+        const d = lk.dir || 's'
+        // 默认隐藏左转/掉头灯（评审：画面更简洁）；右转同样默认过滤可另行开关
+        if (ui.settings.hideRightTurnLights && (d === 'r' || d === 'R')) continue
+        if (!ui.settings.showTurnLights && (d === 'l' || d === 'L' || d === 't' || d === 'T')) continue
         const e = edgeMap.get(lk.from_edge)
         if (!e) continue
         let g = byEdge.get(e.id)
         if (!g) { g = { edge: e, m: {} }; byEdge.set(e.id, g) }
-        const d = lk.dir || 's'
         g.m[d] = g.m[d] === undefined ? st[i] : mergeChar(g.m[d], st[i])
       }
       for (const g of byEdge.values()) {
@@ -702,6 +713,8 @@ function draw(t) {
       const dir = lk.dir || 's'
       // 右转常绿时隐藏右转灯头：跳过右转 link（dir=r/R，来自 net.xml 连接定义）
       if (ui.settings.hideRightTurnLights && (dir === 'r' || dir === 'R')) continue
+      // 默认隐藏左转/掉头灯（UI 过滤，不影响真实信号控制）
+      if (!ui.settings.showTurnLights && (dir === 'l' || dir === 'L' || dir === 't' || dir === 'T')) continue
       const key = `${lk.from_edge}|${lk.from_lane || 0}`
       if (!byLane.has(key)) byLane.set(key, [])
       const bucket = byLane.get(key)
