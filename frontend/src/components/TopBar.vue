@@ -128,20 +128,14 @@ async function onUpload(ev) {
       <select v-model="scheme" class="ctrl" :disabled="sim.status !== 'idle'" title="控制方案">
         <option v-for="s in schemeOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
       </select>
-      <AppButton variant="primary" class="ic-btn" :disabled="!selected || sim.status !== 'idle' || busy"
+      <AppButton variant="primary" :disabled="!selected || sim.status !== 'idle' || busy"
         @click="onStart" :title="busy ? '启动中…' : '启动仿真'">
-        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.6v10.8l9.2-5.4z"/></svg>
+        {{ busy ? '启动中…' : '启动仿真' }}
       </AppButton>
-      <AppButton class="ic-btn" variant="danger" :disabled="sim.status === 'idle' || busy"
-        @click="emit('stop')" title="停止">
-        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.4" y="3.4" width="9.2" height="9.2" rx="1.4"/></svg>
-      </AppButton>
-      <AppButton class="ic-btn" :disabled="sim.status !== 'running'" @click="emit('pause')" title="暂停">
-        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.4" y="2.4" width="3.4" height="11.2" rx="0.9"/><rect x="9.2" y="2.4" width="3.4" height="11.2" rx="0.9"/></svg>
-      </AppButton>
-      <AppButton class="ic-btn" variant="success" :disabled="sim.status !== 'paused'" @click="emit('resume')" title="恢复">
-        <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.6v10.8l9.2-5.4z"/></svg>
-      </AppButton>
+      <AppButton variant="danger" :disabled="sim.status === 'idle' || busy"
+        @click="emit('stop')" title="停止">停止</AppButton>
+      <AppButton :disabled="sim.status !== 'running'" @click="emit('pause')" title="暂停">暂停</AppButton>
+      <AppButton variant="success" :disabled="sim.status !== 'paused'" @click="emit('resume')" title="恢复">恢复</AppButton>
       <select v-model="speed" class="ctrl" :disabled="sim.status === 'idle'" @change="emit('speed', Number(speed))">
         <option :value="1">1×</option><option :value="2">2×</option><option :value="5">5×</option>
       </select>
@@ -183,14 +177,6 @@ async function onUpload(ev) {
   background: var(--bg-elev); color: var(--text-1);
   border: 1px solid var(--border); border-radius: var(--radius-ctrl);
   font-size: 12px;
-}
-/* 播放/停止/暂停 图标按钮（经典三角方块，仅图标） */
-.ic-btn {
-  width: 30px; padding: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.ic-btn .ic {
-  width: 13px; height: 13px; fill: currentColor; display: block;
 }
 .net-dd { position: relative; }
 .net-btn { max-width: 240px; white-space: nowrap; text-align: left; cursor: pointer; }
