@@ -61,6 +61,31 @@ const leftTab = computed(() => {
 
 let timers = []
 let drag = null
+let autoStarted = false   // 页面加载自动启动默认演示（仅一次）
+
+/** 评委开箱即用：自动以默认配置启动 base_network + 默认车流 + 方案二（AI 模式），5× 速度 */
+async function autoStartDefault() {
+  if (autoStarted || sim.status !== 'idle') return
+  autoStarted = true
+  const b = sim.nets.find((n) => n.name === 'base_network')
+  if (!b) return
+  const routes = b.routes || []
+  const match = routes.find((p) => /clean700|traffic_med/.test(p)) || routes[0] || ''
+  const adds = (b.adds || []).find((p) => /timing_safe/.test(p)) || ''
+  try {
+    await sim.start({
+      netPath: b.net_path,
+      routes: match ? [match] : [],
+      addFiles: adds ? [adds] : [],
+      scheme: 'scheme_2',
+      schemeParams: { mode: 'auto', obs_mode: 'agnostic', mappo_weights: 'models/weights/mappo_agnostic_full', stgcn_weights: 'models/weights/stgcn.pt' },
+    })
+    sim.setSpeed(5).catch(() => {})
+  } catch (e) {
+    console.warn('[auto-start] 失败（可手动启动）:', e.message)
+    autoStarted = false
+  }
+}
 
 onMounted(async () => {
   ui.apply()
@@ -69,7 +94,6 @@ onMounted(async () => {
   subscribe('metrics_update', (d) => metrics.applyWs(d))
   subscribe('simulation_step', (d) => { sim.applyStep(d); metrics.applyStep(d) })
 
-  sim.listNetworks()
   agent.fetchStatus()
   metrics.refresh()
 
@@ -79,6 +103,9 @@ onMounted(async () => {
   if (sim.status !== 'idle') {
     try { await sim.stop(); metrics.resetSession() } catch { sim.status = 'idle'; sim.sessionId = null; metrics.resetSession() }
   }
+
+  await sim.listNetworks()          // 等路网清单就绪
+  setTimeout(() => autoStartDefault(), 800)   // 稍等预览渲染后自动开跑默认演示
 
   updateBp()
   window.addEventListener('resize', onResize)
