@@ -27,6 +27,12 @@ async def network_preview(request: Request, name: str = ""):
     return ok(request.app.state.runtime.network_preview_svg(name))
 
 
+@router.get("/networks/preview-data")
+async def network_preview_data(request: Request, net_path: str = "", name: str = ""):
+    """按指定路网导出 GeoJSON（不启动仿真，供页面初始直接展示路网）。"""
+    return ok(request.app.state.runtime.network_geojson(net_path=net_path, name=name))
+
+
 @router.post("/networks/upload")
 async def upload_networks(request: Request, files: list[UploadFile] = File(...)):
     """上传自定义 SUMO 路网（.net.xml + 可选 .rou.xml / .add.xml），保存到 data/networks/custom/。"""

@@ -112,27 +112,45 @@ function clearNet() {
   bounds = null
 }
 
+/** 渲染一份路网 GeoJSON（按 netPath 标注名字），供运行会话与初始预览共用 */
+function showGeojson(gj, netPath) {
+  const feats = gj.features || []
+  if (!feats.length) { clearNet(); hint.value = '请先启动仿真以加载路网'; return }
+  parseGeo(feats)
+  fixStaticHeadings()
+  const meta = sim.nets.find((n) => n.net_path === netPath)
+  if (meta) {
+    netName.value = meta.label || meta.name
+    netFile.value = meta.name
+  } else if (netPath) {
+    netName.value = '路网预览'
+    netFile.value = ''
+  } else {
+    netName.value = '当前路网'
+    netFile.value = ''
+  }
+  hint.value = ''
+  fitView()
+}
+
 async function loadNetwork() {
   try {
     const gj = await apiGet('/network')
-    const feats = gj.features || []
-    if (!feats.length) { clearNet(); hint.value = '请先启动仿真以加载路网'; return }
-    parseGeo(feats)
-    // 路网几何就绪后修正静止车朝向（首批车辆可能早于 edgeMap 到达，
-    // 初始朝向回退过 SUMO angle，对"插入即停"的排队车会是错的方向）
-    fixStaticHeadings()
-    const running = sim.nets.find((n) => n.net_path === sim.lastNetPath)
-    if (running) {
-      netName.value = running.label || running.name
-      netFile.value = running.name
-    } else {
-      netName.value = '当前路网'
-      netFile.value = ''
-    }
-    hint.value = ''
-    fitView()
+    showGeojson(gj, sim.lastNetPath)
   } catch {
     hint.value = '后端未连接'
+  }
+}
+
+/** 初始/未启动预览：直接按选中路网展示几何（不开仿真、无车辆） */
+async function loadPreview() {
+  const p = sim.previewNetPath
+  if (!p || sim.status !== 'idle') return
+  try {
+    const gj = await apiGet('/networks/preview-data?net_path=' + encodeURIComponent(p))
+    showGeojson(gj, p)
+  } catch {
+    /* 后端未起：保持现状 */
   }
 }
 
@@ -1138,9 +1156,15 @@ watch(() => sim.status, (s) => {
     // 若瞬时轮询把 status 误置 idle 而会话仍在，保留画布不被误清
     if (!sim.sessionId) {
       clearNet()
-      hint.value = '请先启动仿真以加载路网'
+      // 未启动也直接展示路网（开箱即见）；无预览目标时才提示
+      if (sim.previewNetPath) loadPreview()
+      else hint.value = '请先启动仿真以加载路网'
     }
   }
+})
+// 初始/未运行：跟随所选路网直接展示几何（运行中不打扰会话路网）
+watch(() => sim.previewNetPath, (p) => {
+  if (p && sim.status === 'idle') loadPreview()
 })
 onMounted(() => {
   refreshColors()
@@ -1150,9 +1174,9 @@ onMounted(() => {
   ]
   raf = requestAnimationFrame(loop)
   window.addEventListener('resize', fitView)
-  // 仅在已有运行会话时加载路网；新打开页面一律空白
-  //（后端残留会话由 App 挂载时自动停止并清空）
+  // 运行会话 → 会话路网；否则若已默认选中路网则直接展示预览（开箱即见）
   if (sim.status === 'running') loadNetwork()
+  else if (sim.previewNetPath) loadPreview()
   // 拉取后端场景清单（失败时用内置清单兜底）
   apiGet('/simulate/scenarios').then((list) => {
     if (Array.isArray(list) && list.length) {
@@ -1197,7 +1221,13 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <div class="canvas-toolbar">
-      <span>{{ ui.testMode ? '测试车辆选路：点击道路加入路线（再点已选边取消）' : '滚轮缩放 · 拖拽平移 · 双击复位 · 点击车辆/道路查看详情' }}</span>
+      <span>{{
+        ui.testMode
+          ? '测试车辆选路：点击道路加入路线（再点已选边取消）'
+          : (sim.status === 'idle' && sim.previewNetPath
+            ? '路网已就绪：选好方案后点击「启动仿真」开始运行'
+            : '滚轮缩放 · 拖拽平移 · 双击复位 · 点击车辆/道路查看详情')
+      }}</span>
     </div>
 
     <!-- 交通场景 + 测试车辆（画布右上角一组） -->

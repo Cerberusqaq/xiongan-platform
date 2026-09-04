@@ -14,11 +14,13 @@ export const useSimStore = defineStore('sim', {
     nets: [],                // GET /networks 列表 [{name, net_path, routes[], adds[]}]
     lastNetPath: null,
     currentEdges: [],        // 当前加载路网的边 id 列表（画布解析后写入，供 Agent/事件用）
+    previewNetPath: '',      // 页面初始/未启动时展示的路网 net_path（开箱即见路网）
     startScheme: 'scheme_2', // 启动方案：none | scheme_1 | scheme_2 | scheme_3
     startScenario: '',       // 启动交通场景：''=默认车流 | sparse/normal/peak/extreme
     lastError: null,
   }),
   actions: {
+    setPreviewNet(p) { this.previewNetPath = p || '' },
     async refreshStatus() {
       try {
         const s = await apiGet('/simulate/status')

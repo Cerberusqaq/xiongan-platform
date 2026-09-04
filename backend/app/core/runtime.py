@@ -326,6 +326,22 @@ class AppRuntime:
     def network_summary(self) -> dict:
         return self._summary or {}
 
+    def network_geojson(self, net_path: str = "", name: str = "") -> dict:
+        """按指定路网导出 GeoJSON（不启动仿真，供页面初始直接展示路网）。
+
+        net_path 优先；name 走扫描缓存；解析失败返回空 FeatureCollection。
+        """
+        import os
+        if name and not net_path:
+            net_path = self._net_paths.get(name, "")
+        if not net_path or not os.path.isfile(net_path):
+            return {"type": "FeatureCollection", "features": []}
+        try:
+            from app.core import geojson as gj
+            return gj.export_geojson(net_path)
+        except Exception:  # noqa: BLE001
+            return {"type": "FeatureCollection", "features": []}
+
     def list_networks(self) -> list[dict]:
         """扫描内置路网目录，返回可加载的路网清单（含配套车流/附加文件）。
 

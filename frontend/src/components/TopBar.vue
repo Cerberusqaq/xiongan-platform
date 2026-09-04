@@ -23,6 +23,8 @@ watch(() => sim.nets.length, (n) => {
     if (b) selected.value = b.net_path
   }
 })
+// 所选路网 → 画布预览目标（NetCanvas 在未运行时直接展示该路网几何）
+watch(selected, (v) => sim.setPreviewNet(v))
 
 // 路网下拉：中文名 + 悬停预览
 const ddOpen = ref(false)
