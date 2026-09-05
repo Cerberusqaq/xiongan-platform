@@ -29,6 +29,8 @@ async function act(schemeId, action, paramsObj = {}) {
     const r = await sim.schemeAction(schemeId, action, paramsObj)
     lastMsg.value = r?.message || `${action} 已执行`
     if (action === 'get_status') lastMsg.value = JSON.stringify(r, null, 0).slice(0, 200)
+    // 动作可能切换了模式/参数：同步顶栏状态（scheme/scheme_mode）
+    sim.refreshStatus().catch(() => {})
   } catch (e) {
     lastMsg.value = `执行失败: ${e.message}`
   }

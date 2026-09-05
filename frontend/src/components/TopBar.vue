@@ -46,6 +46,25 @@ const SCHEMES = [
   { value: 'none', label: '基线 · 固定配时' },
 ]
 
+// 运行中实时显示当前活动方案 + 控制器模式（Agent/面板运行中切换后立即可见）
+const SCHEME_LIVE = {
+  webster: 'Webster 最优配时',
+  scheme_1: '方案一',
+  scheme_2: '方案二',
+  scheme_3: '方案三',
+  none: '固定配时基线',
+}
+const MODE_LIVE = {
+  auto: 'AUTO 自动',
+  mappo: 'MAPPO 强化学习',
+  scoot: 'SCOOT 规则自适应',
+}
+const liveSchemeText = computed(() => {
+  const base = SCHEME_LIVE[sim.scheme] || sim.scheme || '—'
+  const mode = MODE_LIVE[sim.schemeMode]
+  return sim.schemeMode && mode ? `${base} · ${mode}` : base
+})
+
 const netOptions = computed(() => sim.nets)
 
 // 默认方案(webster)仅对 demo 单路口案例可用；其它路网隐藏并在已选中时回退
@@ -127,9 +146,12 @@ async function onUpload(ev) {
       </div>
       <AppButton @click="fileInput.click()" title="上传 SUMO 路网文件（.net.xml + .rou.xml + .add.xml）">上传路网</AppButton>
       <input ref="fileInput" type="file" multiple accept=".xml" hidden @change="onUpload" />
-      <select v-model="scheme" class="ctrl" :disabled="sim.status !== 'idle'" title="控制方案">
+      <select v-if="sim.status === 'idle'" v-model="scheme" class="ctrl" title="控制方案（启动时选择）">
         <option v-for="s in schemeOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
       </select>
+      <span v-else class="scheme-live" title="当前运行方案（Agent / 面板可在运行中切换模式）">
+        当前：{{ liveSchemeText }}
+      </span>
       <AppButton variant="primary" :disabled="!selected || sim.status !== 'idle' || busy"
         @click="onStart" :title="busy ? '启动中…' : '启动仿真'">
         {{ busy ? '启动中…' : '启动仿真' }}

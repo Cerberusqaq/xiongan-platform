@@ -8,7 +8,8 @@ export const useSimStore = defineStore('sim', {
     sessionId: null,
     step: 0,
     simTime: 0,
-    scheme: null,
+    scheme: null,            // 后端实际活动方案（refreshStatus 轮询/动作后刷新）
+    schemeMode: '',          // 活动方案控制器模式（scheme_2: mappo/scoot/auto），Agent/面板切换后即时可见
     speed: 1,
     starting: false,         // 启动请求进行中
     nets: [],                // GET /networks 列表 [{name, net_path, routes[], adds[]}]
@@ -29,6 +30,7 @@ export const useSimStore = defineStore('sim', {
         this.step = s.step
         this.simTime = s.sim_time
         this.scheme = s.scheme
+        this.schemeMode = s.scheme_mode || ''
       } catch (e) {
         // 保留上一状态：瞬时网络失败/超时不应把状态误置 idle
         //（否则 NetCanvas 会把画布清空——如暂停期间慢请求偶发超时）
@@ -50,6 +52,10 @@ export const useSimStore = defineStore('sim', {
         this.lastNetPath = netPath
         this.startScheme = scheme
         this.startScenario = scenario
+        // 立即同步活动方案/模式（后端 start 响应已含 status）
+        const st = d.status || {}
+        this.scheme = st.scheme || scheme
+        this.schemeMode = st.scheme_mode || ''
         this.status = 'running'
         return d
       } finally {

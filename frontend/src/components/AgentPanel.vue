@@ -72,11 +72,10 @@ async function sendQuick() {
   rollSuggestion()          // 发送后自动换一条，供连续提问
 }
 function clearSuggestion() { suggestion.value = '' }
-/** 一键把当前建议指令复制到输入框，便于手动修改后再发送 */
+/** 一键把当前建议指令复制到输入框，便于手动修改后再发送（建议条保持显示） */
 function copyToInput() {
   if (!suggestion.value) return
   input.value = suggestion.value
-  clearSuggestion()
   pulseInput()
 }
 
@@ -157,6 +156,8 @@ async function send(text = input.value) {
   input.value = ''
   try {
     await agent.chat(text)
+    // Agent 可能运行中切换了方案/模式：立即同步顶栏状态（scheme/scheme_mode）
+    sim.refreshStatus().catch(() => {})
   } catch { /* 错误已存入 agent.error */ }
   await nextTick()
   if (listRef.value) listRef.value.scrollTop = listRef.value.scrollHeight

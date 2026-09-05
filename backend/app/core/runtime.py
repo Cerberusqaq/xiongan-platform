@@ -165,11 +165,22 @@ class AppRuntime:
     def status(self) -> dict:
         if self.session is None:
             return {"state": "idle", "session_id": None, "step": 0,
-                    "sim_time": 0, "scheme": "none", "scenario": "",
+                    "sim_time": 0, "scheme": "none", "scheme_mode": None,
+                    "scenario": "",
                     "vehicle_count": 0}
         st = self.session.status()
         st["scenario"] = self.scenario
         st["safety_net"] = self.safety_net.status() if self.safety_net else None
+        # 活动方案的控制器模式（如 scheme_2 的 mappo/scoot/auto），
+        # 供前端顶栏实时展示 Agent / 用户运行中切换后的状态
+        st["scheme_mode"] = None
+        if self.scheme is not None:
+            try:
+                gs = self.scheme.handle_action("get_status", {})
+                if isinstance(gs, dict):
+                    st["scheme_mode"] = gs.get("mode") or None
+            except Exception:  # noqa: BLE001
+                st["scheme_mode"] = None
         return st
 
     def list_scenarios(self) -> list[dict]:
