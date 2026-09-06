@@ -18,7 +18,7 @@ const panelStyle = computed(() => ({ maxHeight: Math.round(vh.value * MAX_H_RATI
 const SWITCHES = [
   { key: 'dblClickReset', label: '双击画布复位视图', desc: '关闭后双击不再复位缩放/平移' },
   { key: 'infoAutoRefresh', label: '选中信息自动刷新', desc: '每 4 秒刷新选中对象的数据' },
-  { key: 'showMedian', label: '显示中央分隔线', desc: '双向道路之间的黄色虚线' },
+  { key: 'showMedian', label: '显示中央分隔线', desc: '双向道路之间加宽中缝空隙 + 双黄线' },
   { key: 'showLights', label: '显示信号灯', desc: '路口逐进口信号灯' },
   { key: 'showVehicles', label: '显示车辆', desc: '关闭后可专注查看路网' },
   { key: 'showLegend', label: '显示事件图例', desc: '左上角事故/施工/突发车流颜色图例' },

@@ -48,6 +48,9 @@
   --net-edge: oklch(0.34 0.008 80);
   --net-edge-highlight: oklch(0.60 0.02 80);
   --net-node: oklch(0.42 0.008 80);
+
+  /* 道路中央双黄线（双向路分隔；深色主题用亮黄、浅色主题用深黄保证对比） */
+  --road-yellow: oklch(0.86 0.16 95);
 }
 
 [data-theme='light'] {
@@ -87,6 +90,8 @@
   --net-edge: oklch(0.72 0.01 80);
   --net-edge-highlight: oklch(0.55 0.02 80);
   --net-node: oklch(0.62 0.008 80);
+
+  --road-yellow: oklch(0.60 0.15 85);
 }
 
 /* 通用 token */

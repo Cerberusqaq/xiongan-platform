@@ -88,6 +88,8 @@ function refreshColors() {
     accent: v('--accent'), greenSoft: v('--signal-green-soft'), redSoft: v('--signal-red-soft'),
     // 信号灯专用（红半透明 / 荧光黄 / 高亮绿）
     lgRed: v('--light-red'), lgYellow: v('--light-yellow'), lgGreen: v('--light-green'),
+    // 道路中央双黄线（双向路分隔线）
+    roadYellow: v('--road-yellow'),
   }
 }
 watch(() => ui.theme, refreshColors)
@@ -172,6 +174,7 @@ function parseGeo(feats) {
         laneShapes: f.properties.lane_shapes || null,
         off: 0,
         partnerId: null,
+        mid: null,            // 双向中缝中线（两方向轴线中点，绘制中缝/双黄线的锚）
         contTo: null,
         contFrom: null,
       }
@@ -196,6 +199,18 @@ function parseGeo(feats) {
       e.partnerId = p.id
       p.partnerId = e.id
     }
+  }
+  // 双向中缝中线：真实几何下两方向 laneShapes 内侧车道间为空位，
+  // 中缝锚点取"两方向轴线逐站中点"（比任一条 edge shape 都居中）。
+  // 有真实车道时可直接用 partner 的 laneShapes 求包络中点，这里统一用轴线求，
+  // 对平滑路网足够（两方向轴线在路口处以节点收拢，长度基本一致）。
+  for (const e of edges.value) {
+    if (!e.partnerId || e.mid) continue
+    const p = edgeMap.get(e.partnerId)
+    if (!p) continue
+    const mid = corridorMidline(e.pts, p.pts)
+    e.mid = mid
+    p.mid = mid
   }
   // 同向延续边（路口对侧同一条路的同向段）：车道线穿过路口时相接
   contMap.clear()
@@ -388,6 +403,35 @@ function trimPolyline(pts, cut) {
   return out
 }
 
+/** 把点列按弧长均匀重采样为 n 个点（首尾保留），供两条轴线按"同一里程"逐站取中点 */
+function resamplePolyline(pts, n) {
+  const m = pts.length
+  if (m < 2) return pts.slice()
+  const cum = [0]
+  for (let i = 1; i < m; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]))
+  const total = cum[m - 1]
+  if (total <= 0) return [pts[0], pts[m - 1]]
+  const at = (d) => {
+    let i = 0
+    while (i < m - 2 && cum[i + 1] < d) i++
+    const f = (d - cum[i]) / (cum[i + 1] - cum[i] || 1e-9)
+    return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f,
+            pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f]
+  }
+  const out = []
+  for (let k = 0; k < n; k++) out.push(at((total * k) / (n - 1)))
+  return out
+}
+
+/** 双向道路中缝中线：两方向轴线（pts 反向）按同一里程逐站取中点。
+ *  netedit 平滑后两方向 edge shape 各自落在半幅（如 E14_7≈183、E7_14≈177），
+ *  单取一条会偏半幅；取中点才是真正的中央分隔位置。 */
+function corridorMidline(a, b) {
+  const A = resamplePolyline(a, 96)
+  const B = resamplePolyline(b.slice().reverse(), 96) // partner 与 a 走向相反，翻成同向再逐站匹配
+  return A.map((p, i) => [(p[0] + B[i][0]) / 2, (p[1] + B[i][1]) / 2])
+}
+
 /** 屏幕空间的多段线（整体横向偏移 offPx + 附加不渐隐偏移 extra，均沿屏幕垂直方向） */
 function polyScreen(e, offPx, extra = 0) {
   return screenShape(e.pts, offPx, extra)
@@ -428,6 +472,7 @@ function draw(t) {
   // 1) 道路：真实车道几何（SUMO lane shape）或公式回退；同向延续边在路口相接
   ctx.lineCap = 'round'
   const medians = new Set()
+  const medianPairs = []
   const contOff = (x) => (x && x.off ? Math.max(3.5, x.off * S) : 0)
   const bedW = Math.max(3.5, 3.2 * S)
   for (const e of edges.value) {
@@ -485,17 +530,50 @@ function draw(t) {
     }
     if (e.contTo) bridge(e.contTo, false)
     if (e.contFrom) bridge(e.contFrom, true)
-    // 中央分隔线（双向道路，每对只画一次；两端停车，路口区不画）
+    // 中央分隔线对收集（每对只画一次；等双向两侧路面都画完，统一叠加到最上层，
+    // 否则 partner 方向后画的车道会把中缝空隙盖掉）
     if (ui.settings.showMedian && e.off && e.partnerId && !medians.has(e.id) && !medians.has(e.partnerId)) {
       medians.add(e.id)
       medians.add(e.partnerId)
-      ctx.strokeStyle = c.borderStrong
-      ctx.lineWidth = Math.max(1, S * 0.9)
-      ctx.setLineDash([5, 4])
-      const M = screenShape(trimPolyline(e.pts, 8), 0, 0)
-      tracePoly(ctx, M)
-      ctx.setLineDash([])
+      medianPairs.push(e)
     }
+  }
+
+  // 1.1) 双向中央分隔：中缝空隙（画布底色带）+ 双黄线。
+  // 真实车道几何是原位的——两方向内侧车道在 SUMO 里贴齐（无天然空位），
+  // 所以"空隙"用画布底色沿两方向真中线画一条中央带实现：
+  // 路面本身不动（车不偏、不麻花），中央带两侧边缘再各画一条黄实线组成双黄线。
+  if (ui.settings.showMedian && medianPairs.length) {
+    for (const e of medianPairs) {
+      const p = edgeMap.get(e.partnerId)
+      const hasRealPair = e.laneShapes && e.laneShapes.length === e.lanes &&
+        p && p.laneShapes && p.laneShapes.length === p.lanes
+      const baseWorld = (e.mid && e.mid.length >= 2) ? trimPolyline(e.mid, 8) : trimPolyline(e.pts, 8)
+      if (hasRealPair && baseWorld.length >= 2) {
+        const gapPx = Math.max(3, 1.6 * S)   // 中央空隙总宽（世界≈1.6m，随缩放）
+        const ylW = Math.max(1.5, 0.6 * S)   // 单条黄线宽
+        const ylOff = gapPx / 2 + ylW / 2    // 黄线居中：紧贴空隙外侧、完全落在各自路面
+        // 1) 中缝空隙：画布底色带（在两侧路面之上，作为两方向之间的视觉空位）
+        ctx.strokeStyle = c.bg
+        ctx.lineWidth = gapPx
+        ctx.lineCap = 'butt'
+        tracePoly(ctx, screenShape(baseWorld, 0, 0))
+        // 2) 双黄线：空隙两侧各一条黄实线
+        ctx.strokeStyle = c.roadYellow
+        ctx.lineWidth = ylW
+        ctx.lineCap = 'round'
+        tracePoly(ctx, screenShape(baseWorld, ylOff))
+        tracePoly(ctx, screenShape(baseWorld, -ylOff))
+      } else {
+        // 无真实车道几何的回退：单条虚线
+        ctx.strokeStyle = c.borderStrong
+        ctx.lineWidth = Math.max(1, S * 0.9)
+        ctx.setLineDash([5, 4])
+        tracePoly(ctx, screenShape(baseWorld, 0, 0))
+        ctx.setLineDash([])
+      }
+    }
+    ctx.lineCap = 'round'
   }
 
   // 1.5) 扰动事件标记：受影响边高亮 + 中点脉冲圆点
@@ -1018,7 +1096,10 @@ function vehicleScreenPos(v, k) {
     const lp = v.lane.split('_')
     lp.pop()
     const e = edgeMap.get(lp.join('_'))
-    if (e && e.off) shift = Math.max(3.5, e.off * view.scale)
+    // 双向分离偏移只作用于"无真实车道几何"的回退画法；真实 laneShapes 路与车都原位
+    if (e && e.off && !(e.laneShapes && e.laneShapes.length === (e.lanes || 1))) {
+      shift = Math.max(3.5, e.off * view.scale)
+    }
   }
   return { x: X(x) - Math.sin(ang) * shift, y: Y(y) + Math.cos(ang) * shift, ang }
 }
