@@ -98,7 +98,7 @@ const SETTINGS_DEFAULTS = {
   showEvalCharts: false, // 底部离线评估柱状图与对比表格（默认关闭）
   rightTurnGreen: false,  // 右转常绿：启动时把右转信号恒为绿灯（运行时覆写，不改相位结构）
   hideRightTurnLights: false, // 隐藏右转灯：右转常绿时隐藏右转灯头显示（子选项）
-  showTurnLights: false,  // 显示左转/掉头灯：默认关闭=隐藏（评审视觉简化；仅 UI，不影响真实控制）
+  showTurnLights: true,   // 显示左转/掉头灯：评委默认=开（最左车道有左转相位就显示左转，画面不单调）
   lightMode: 'bare',     // 信号灯样式：solid 实心圆 | framed 圆框箭头 | bare 无框箭头（评委默认）
   minimalLights: true,   // 极简模式：每车道仅显示一个方向的信号灯（评委默认，配合 bare）
   leftMode: 'tabs',      // 左栏模式：stacked 堆叠 | tabs 单栏切换（评委默认=单栏页签）

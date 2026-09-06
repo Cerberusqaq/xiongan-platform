@@ -748,13 +748,17 @@ function draw(t) {
       if (!e) continue
       // 同车道多灯按 掉头→左转→直走→右转 从左到右排列（符合现实次序）
       arr.sort((a, b) => (MOV_RANK[a.dir] ?? 9) - (MOV_RANK[b.dir] ?? 9))
-      // 极简模式：每车道仅显示一个方向的灯——取该车道“主信号方向”
-      // 优先级 直行 > 左转 > 右转 > 掉头（s/l 优先于 r：直左/左右共享车道不误显示为右转，
-      // 纯右转专用道 lane0 无 s/l 时自然落到 r；修复 E6_13 这类 lane1 同挂 r/l/t 时的“双右转”）
+      // 极简模式：每车道仅显示一个方向的灯——选该车道的“主信号”。
+      // 特殊规则：**最左车道**存在左转相位时优先显示左转（真实信号机最左道多为
+      // 直左/左转，画直行会显得“全直走”太单调）；其余车道按 直行>左转>右转>掉头。
       if (minimalLights) {
-        const MIN_RANK = { s: 3, S: 3, l: 2, L: 2, r: 1, R: 1, t: 0, T: 0 }
-        const best = arr.reduce((b, x) =>
-          ((MIN_RANK[x.dir] ?? -1) > (MIN_RANK[b.dir] ?? -1) ? x : b))
+        const isLeftmost = (arr[0].lane ?? 0) >= ((e?.lanes || 1) - 1)
+        const rankOf = (d) => {
+          const dl = (d || '').toLowerCase()
+          if (isLeftmost && dl === 'l') return 4          // 最左车道：左转优先
+          return { s: 3, l: 2, r: 1, t: 0 }[dl] ?? -1
+        }
+        const best = arr.reduce((b, x) => (rankOf(x.dir) > rankOf(b.dir) ? x : b))
         arr.length = 0
         arr.push(best)
       }
