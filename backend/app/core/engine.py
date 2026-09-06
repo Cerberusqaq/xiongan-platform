@@ -29,7 +29,7 @@ class Engine:
         self._cum_departed = 0
         self._edge_length_cache: dict[str, float] = {}
         self._edge_speed_cache: dict[str, float] = {}
-        self._conn_dir_map: dict[str, list[str]] = {}  # tls_id -> 按 linkIndex 升序的 dir 列表
+        self._conn_dir_map: dict[str, dict[int, str]] = {}  # tls_id -> {linkIndex: dir}
         self._rt_original: dict[str, dict] = {}  # tls_id -> 右转常绿覆写前的原程序快照
 
     # ── 生命周期 ────────────────────────────────────────────
@@ -334,6 +334,12 @@ class Engine:
 
         前端据此在对应进口方向绘制逐车道信号灯。静态数据，按 tls 缓存。
         dir 取自 net.xml 连接定义（s/l/r/t），供"隐藏右转灯"等按转向过滤。
+
+        对齐关键：TraCI getControlledLinks / phase state 都按**全局 linkIndex**
+        排序且**空槽占位**（部分路口 linkIndex 缺号，如 0,1,3,4… 缺 2 号，
+        但 state 第 2 字符仍存在）。因此这里必须逐槽位遍历、空槽也保留占位项，
+        并让返回列表与 state_str 同长同序——否则 links 压缩后序号与 state 字符
+        错位，前端会把绿灯贴到错误进口（曾表现为“四直行同绿”等假冲突）。
         """
         cached = self._tls_links_cache.get(tls_id)
         if cached is not None:
@@ -342,19 +348,22 @@ class Engine:
         links: list[dict] = []
         try:
             raw = traci.trafficlight.getControlledLinks(tls_id)
-            for lnk in raw:
+            for global_idx, lnk in enumerate(raw):
                 inner = lnk[0] if (len(lnk) == 1 and isinstance(lnk[0], tuple)) else lnk
                 parts = tuple(inner)
-                if not parts:
-                    continue
-                frm = parts[0]
+                frm = parts[0] if parts else ""
+                lane_id = ""
+                lane_idx = -1
                 if isinstance(frm, (tuple, list)):
-                    lane_id = str(frm[0])
+                    lane_id = str(frm[0]) if frm else ""
                     lane_idx = int(frm[1]) if len(frm) > 1 and isinstance(frm[1], int) else 0
-                else:
+                elif frm:
                     lane_id = str(frm)
                     lane_idx = 0
                 if not lane_id:
+                    # 空槽：SUMO 保留该 linkIndex 位置但无实际连接 → 占位保持序号对齐
+                    links.append({"from_edge": "", "from_lane": -1,
+                                  "dir": "", "_slot": global_idx})
                     continue
                 # lane id 形如 "E14_1_0" → 边 "E14_1"，车道 0（从 id 尾部解析车道号）
                 edge = lane_id.rpartition("_")[0]
@@ -363,12 +372,15 @@ class Engine:
                     if tail.isdigit():
                         lane_idx = int(tail)
                 if not edge:
+                    links.append({"from_edge": "", "from_lane": -1,
+                                  "dir": "", "_slot": global_idx})
                     continue
+                # dir 按全局 linkIndex 槽位取（net.xml 连接 dir），与 state 字符对齐
                 links.append({
                     "from_edge": edge,
                     "from_lane": lane_idx,
-                    # link 顺序与 state_str 字符、net.xml linkIndex 一一对应
-                    "dir": self._dir_at(tls_id, len(links)),
+                    "dir": self._dir_at(tls_id, global_idx),
+                    "_slot": global_idx,
                 })
         except traci.TraCIException:  # noqa: BLE001
             pass
@@ -378,10 +390,12 @@ class Engine:
     def get_tls_conn_details(self, tls_id: str) -> list[dict]:
         """受控 link 的详细连接信息（与 state_str 字符一一对应）。
 
-        [{from_edge, from_lane, via_lane, to_edge, dir}]：via_lane 是路口内
+        [{from_edge, from_lane, via_lane, to_edge, dir, _slot}]：via_lane 是路口内
         内部车道（若有），to_edge 是出口边（供防溢出示绿判堵）。
         防御式解析：getControlledLinks 在不同 SUMO 版本/路网下的元组顺序
         可能为 (from, via, to) 或 (from, to, via)，按":"内道前缀区分。
+        与 get_tls_links 相同：空槽占位保留（_slot = 全局 linkIndex），
+        返回列表与 state_str 同长同序。
         """
         cached = self._tls_links_cache.get(tls_id)
         if cached is not None and "via_lane" in (cached[0] if cached else {}):
@@ -390,25 +404,33 @@ class Engine:
         links: list[dict] = []
         try:
             raw = traci.trafficlight.getControlledLinks(tls_id)
-            for lnk in raw:
+            for global_idx, lnk in enumerate(raw):
                 inner = lnk[0] if (len(lnk) == 1 and isinstance(lnk[0], tuple)) else lnk
                 parts = tuple(inner)
-                if not parts:
-                    continue
-                frm = parts[0]
+                frm = parts[0] if parts else ""
+                lane_id = ""
+                lane_idx = -1
                 if isinstance(frm, (tuple, list)):
-                    lane_id = str(frm[0])
+                    lane_id = str(frm[0]) if frm else ""
                     lane_idx = int(frm[1]) if len(frm) > 1 and isinstance(frm[1], int) else 0
-                else:
+                elif frm:
                     lane_id = str(frm)
                     lane_idx = 0
                 if not lane_id:
+                    links.append({"from_edge": "", "from_lane": -1,
+                                  "via_lane": "", "to_edge": "",
+                                  "dir": "", "_slot": global_idx})
                     continue
                 edge = lane_id.rpartition("_")[0]
                 if lane_idx == 0 and "_" in lane_id:
                     tail = lane_id.rsplit("_", 1)[-1]
                     if tail.isdigit():
                         lane_idx = int(tail)
+                if not edge:
+                    links.append({"from_edge": "", "from_lane": -1,
+                                  "via_lane": "", "to_edge": "",
+                                  "dir": "", "_slot": global_idx})
+                    continue
                 # 出口边/内部车道：parts[1..2] 防御式区分
                 def _lane_name(x):
                     if isinstance(x, (tuple, list)) and x:
@@ -422,13 +444,14 @@ class Engine:
                     via, to_lane = p2, p1
                 else:
                     via, to_lane = "", p1 or p2
+                # dir 按全局 linkIndex 槽位取（net.xml 连接 dir），与 state 字符对齐
                 links.append({
                     "from_edge": edge,
                     "from_lane": lane_idx,
                     "via_lane": via,
                     "to_edge": to_lane.rpartition("_")[0] if to_lane else "",
-                    # 本地序号（0..n-1）索引升序 dir 列表 → 与 state_str 字符对齐
-                    "dir": self._dir_at(tls_id, len(links)),
+                    "dir": self._dir_at(tls_id, global_idx),
+                    "_slot": global_idx,
                 })
         except traci.TraCIException:  # noqa: BLE001
             pass
@@ -436,13 +459,15 @@ class Engine:
         return links
 
     def _load_conn_dir_map(self) -> None:
-        """解析 net.xml 的连接定义：tls_id -> 按 linkIndex 升序的 dir 列表。
+        """解析 net.xml 的连接定义：tls_id -> {linkIndex: dir}。
 
-        <connection ... tl linkIndex dir/> 中 linkIndex 是该 tls **全局**受控序号
-        （多信号机共享 tls 时从 0 起连续递增，如某 tls 的受控连接可能是 15~19），
-        state_str 字符序 = 该 tls 受控连接按 linkIndex 升序。因此把每个 tls 的
-        dir 按 linkIndex 升序存成列表，运行时用本地序号（0..n-1）索引即可与
-        state_str 字符一一对应。惰性加载 + 进程内缓存。
+        <connection ... tl linkIndex dir/>：linkIndex 是该 tls 受控槽位的全局序号
+        （部分路口存在空槽——net.xml 连接缺号但 SUMO phase state / TraCI
+        getControlledLinks 仍为该序号保留位置，如某 tls 受控连接可能是 0,1,3,4...
+        缺 2）。state_str 字符序 = 受控槽位按 linkIndex 升序，**空槽也占一个字符**，
+        因此 dir 必须按 linkIndex 全局索引（缺失 idx 视为空槽，dir=''），
+        不能压缩成连续列表，否则与 state 字符错位（曾导致“四直行同绿”等
+        绿灯贴错方向的显示假象）。惰性加载 + 进程内缓存。
         """
         if self._conn_dir_map or not self._net_file:
             return
@@ -460,24 +485,26 @@ class Engine:
         except Exception:  # noqa: BLE001 解析失败则右转相关功能不可用
             self._conn_dir_map = {}
             return
-        for tl, idx_dir in collected.items():
-            self._conn_dir_map[tl] = [d for _, d in sorted(idx_dir.items())]
+        self._conn_dir_map = collected
 
-    def _dir_at(self, tls_id: str, local_idx: int) -> str:
-        """该 tls 本地第 local_idx 个受控 link 的转向（s/l/r/t），越界返回空串。"""
-        dirs = self._conn_dir_map.get(tls_id)
-        if not dirs:
+    def _dir_at(self, tls_id: str, global_idx: int) -> str:
+        """该 tls 全局第 global_idx 个受控槽位的转向（s/l/r/t），空槽/越界返回空串。
+
+        global_idx 与 state_str 字符位置一一对应（含空槽占位）。
+        """
+        m = self._conn_dir_map.get(tls_id)
+        if not m:
             return ""
-        return dirs[local_idx] if 0 <= local_idx < len(dirs) else ""
+        return m.get(global_idx, "")
 
     def right_turn_link_indices(self, tls_id: str) -> list[int]:
-        """该信号机状态字中属于右转的字符下标（本地序，与 state_str 对齐）。
+        """该信号机状态字中属于右转的字符下标（全局槽位序，与 state_str 对齐）。
 
         SUMO 的 dir 大小写都可能出现（'r'/'R'），统一视为右转。
         """
         self._load_conn_dir_map()
-        dirs = self._conn_dir_map.get(tls_id, [])
-        return [i for i, d in enumerate(dirs) if d in ("r", "R")]
+        m = self._conn_dir_map.get(tls_id, {})
+        return sorted(i for i, d in m.items() if d in ("r", "R"))
 
     def _tls_phase_count(self, tls_id: str) -> int:
         """当前信号方案的相位总数（缓存，避免高频调用昂贵定义接口）。"""

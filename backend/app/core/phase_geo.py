@@ -59,9 +59,13 @@ def build_phase_serving(engine):
         if jcoord is None:
             continue
         links = traci.trafficlight.getControlledLinks(tls_id)
-        # 收集每个 link 的 (相位索引, 上游边, 下游边)
+        # 收集每个 link 的 (全局槽位序, 上游边, 下游边)。
+        # 关键：TraCI getControlledLinks 顺序 = state 字符序，且部分路口存在
+        # **空槽**（受控序号缺号但仍占一个字符位，如 0,1,3,4… 缺 2）。
+        # 必须记录全局槽位序号并按它取 state 字符，否则压缩序号与相位状态
+        # 字符错位，绿灯服务的 link 会映射错方向（与前端灯位错位同源）。
         link_meta = []
-        for lnk in links:
+        for slot, lnk in enumerate(links):
             inner = lnk[0] if (len(lnk) == 1 and isinstance(lnk[0], tuple)) else lnk
             parts = tuple(inner)
             if len(parts) < 2:
@@ -83,7 +87,7 @@ def build_phase_serving(engine):
             approach = compass_of(f_far, jcoord)
             exit_app = compass_of(t_far, jcoord)
             direction = classify(approach, exit_app)
-            link_meta.append((direction, from_edge.getID(), to_edge.getID()))
+            link_meta.append((slot, direction, from_edge.getID(), to_edge.getID()))
 
         # 相位 → 该相位放行的 link（按 state 判断 G/g）
         try:
@@ -96,10 +100,10 @@ def build_phase_serving(engine):
         for pi, ph in enumerate(logic.phases):
             if not ("G" in ph.state or "g" in ph.state):
                 continue
-            # 该相位放行的 link：state 对应位置为 G/g
+            # 该相位放行的 link：state[全局槽位] 为 G/g
             served = []
-            for li, (_, src, dst) in enumerate(link_meta):
-                if li < len(ph.state) and ph.state[li] in "Gg":
+            for slot, _, src, dst in link_meta:
+                if slot < len(ph.state) and ph.state[slot] in "Gg":
                     served.append((src, dst))
             if served:
                 # 去重：同一 (上游,下游) 可能被多股车道覆盖，避免压力重复计数
