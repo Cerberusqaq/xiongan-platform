@@ -136,7 +136,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyrrgrrrryyyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -151,7 +151,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrrryygrrrrgrrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -166,7 +166,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrrryyyrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -181,7 +181,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrrgrryygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -208,7 +208,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyrrgrrrryyyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -223,7 +223,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrrryygrrrrgrrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -238,7 +238,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrrryyyrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -253,7 +253,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrrgrryygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -280,7 +280,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyrrgrrrryyyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -295,7 +295,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrrryygrrrrgrrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -310,7 +310,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrrryyyrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -325,7 +325,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrrgrryygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -424,7 +424,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyyryyrrggrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -434,7 +434,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "grrrrryyggrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -456,7 +456,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyyryyrrggrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -466,7 +466,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "grrrrryyggrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -488,7 +488,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyyryyrrggrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -498,7 +498,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "grrrrryyggrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -633,7 +633,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -643,7 +643,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrryyyyygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -665,7 +665,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -675,7 +675,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrryyyyygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -697,7 +697,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -707,7 +707,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrryyyyygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -852,7 +852,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrrryyyrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -867,7 +867,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrrgrryygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -882,7 +882,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrrrrrgrrrryyyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -897,7 +897,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyyygrrrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -924,7 +924,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrrryyyyygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -939,7 +939,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrrrrrgrrrryyyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -954,7 +954,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyyygrrrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -981,7 +981,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyrrgrrrryyyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -996,7 +996,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrrryygrrrrgrrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1011,7 +1011,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrrryyyrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1026,7 +1026,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrrgrryygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1125,7 +1125,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyyyggrryyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1135,7 +1135,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rrrryyyygrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -1157,7 +1157,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyyyggrryyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1167,7 +1167,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rrrryyyygrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -1189,7 +1189,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyyyggrryyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1199,7 +1199,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rrrryyyygrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -1334,7 +1334,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1344,7 +1344,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1354,7 +1354,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -1376,7 +1376,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1386,7 +1386,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1396,7 +1396,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -1418,7 +1418,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1428,7 +1428,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1438,7 +1438,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -1532,7 +1532,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "ggrrgrrryyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1542,7 +1542,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyyygrrrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -1564,7 +1564,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "ggrrgrrryyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1574,7 +1574,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyyygrrrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -1596,7 +1596,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "ggrrgrrryyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1606,7 +1606,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyyygrrrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -1741,7 +1741,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyrrgrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1756,7 +1756,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrryygrrrrgrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1771,7 +1771,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1786,7 +1786,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1813,7 +1813,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyrrgrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1828,7 +1828,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrryygrrrrgrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1843,7 +1843,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1858,7 +1858,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1885,7 +1885,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyrrgrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1900,7 +1900,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrryygrrrrgrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1915,7 +1915,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -1930,7 +1930,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2116,7 +2116,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyyyggrrrggrrrryyyyyygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2126,7 +2126,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrrggrrryyyyyyggrrrryyyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2136,7 +2136,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrryyyyyggrrrrggrrrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -2158,7 +2158,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyyyggrrrggrrrryyyyyygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2168,7 +2168,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrrggrrryyyyyyggrrrryyyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2178,7 +2178,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrryyyyyggrrrrggrrrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -2200,7 +2200,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyyyggrrrggrrrryyyyyygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2210,7 +2210,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrrggrrryyyyyyggrrrryyyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2220,7 +2220,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrryyyyyggrrrrggrrrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -2314,7 +2314,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyrrggrryyyr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2329,7 +2329,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rryyggrrgrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2356,7 +2356,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyrrggrryyyr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2371,7 +2371,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rryyggrrgrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2398,7 +2398,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyrrggrryyyr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2413,7 +2413,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rryyggrrgrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2563,7 +2563,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyrrgrrrryyyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2578,7 +2578,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrrryygrrrrgrrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2593,7 +2593,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrrryyyrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2608,7 +2608,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrrgrryygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2635,7 +2635,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyrrgrrrryyyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2650,7 +2650,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrrryygrrrrgrrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2665,7 +2665,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrrryyyrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2680,7 +2680,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrrgrryygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2707,7 +2707,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyrrgrrrryyyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2722,7 +2722,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrrryygrrrrgrrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2737,7 +2737,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrrryyyrrgrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2752,7 +2752,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrrgrryygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2892,7 +2892,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyrrgrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2907,7 +2907,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrryygrrrrgrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2922,7 +2922,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2937,7 +2937,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2964,7 +2964,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyrrgrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2979,7 +2979,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrryygrrrrgrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -2994,7 +2994,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3009,7 +3009,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3036,7 +3036,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyrrgrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3051,7 +3051,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgrryygrrrrgrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3066,7 +3066,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3081,7 +3081,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3195,7 +3195,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyy",
+      "state": "ggrrryyyyryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3210,7 +3210,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyy",
+      "state": "ggyyygrrrrrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3225,7 +3225,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyy",
+      "state": "ggrrrgrrrrrrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3257,7 +3257,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyy",
+      "state": "ggrrryyyyryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3272,7 +3272,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyy",
+      "state": "ggyyygrrrrrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3287,7 +3287,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyy",
+      "state": "ggrrrgrrrrrrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3314,7 +3314,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyy",
+      "state": "ggrrryyyyryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3329,7 +3329,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyy",
+      "state": "ggyyygrrrrrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3344,7 +3344,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyy",
+      "state": "ggrrrgrrrrrrryy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3448,7 +3448,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyrrygrrgrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3458,7 +3458,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rrrrggrryyyr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -3480,7 +3480,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyrrygrrgrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3490,7 +3490,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rrrrggrryyyr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -3512,7 +3512,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyrrygrrgrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3522,7 +3522,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rrrrggrryyyr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -3657,7 +3657,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrryyyyygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3667,7 +3667,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryyyyy",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -3689,7 +3689,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrryyyyygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3699,7 +3699,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryyyyy",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -3721,7 +3721,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrryyyyygrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3731,7 +3731,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryyyyy",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -3876,7 +3876,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyyygrrrryyyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3886,7 +3886,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrrryyyyygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -3908,7 +3908,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyyygrrrryyyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3918,7 +3918,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrrryyyyygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -3940,7 +3940,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyyygrrrryyyyyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -3950,7 +3950,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrrryyyyygrrrrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4044,7 +4044,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rrrryyyygrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4054,7 +4054,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyrrggrryyyr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4076,7 +4076,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rrrryyyygrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4086,7 +4086,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyrrggrryyyr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4108,7 +4108,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "rrrryyyygrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4118,7 +4118,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyy",
+      "state": "yyrrggrryyyr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4253,7 +4253,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4263,7 +4263,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyrrgrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4285,7 +4285,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4295,7 +4295,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyrrgrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4317,7 +4317,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyrrgrrrryyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4327,7 +4327,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyrrgrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4462,7 +4462,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyrrgrrrryyyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4472,7 +4472,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrryyyrrgrrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4494,7 +4494,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyrrgrrrryyyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4504,7 +4504,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrryyyrrgrrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4526,7 +4526,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyrrgrrrryyyyrrgrrrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4536,7 +4536,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrryyyrrgrrrrryyyrr",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4671,7 +4671,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrryyyyygggrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4681,7 +4681,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygggrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4691,7 +4691,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryygyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4701,7 +4701,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgyyyygrrrrgggyy",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4723,7 +4723,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrryyyyygggrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4733,7 +4733,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygggrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4743,7 +4743,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryygyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4753,7 +4753,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgyyyygrrrrgggyy",
       "dur": 3.0,
       "kind": "yellow"
      }
@@ -4775,7 +4775,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "yyyyygrrrryyyyygggrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4785,7 +4785,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grryygrrrrgrryygggrr",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4795,7 +4795,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrryyyyygrrrryygyy",
       "dur": 3.0,
       "kind": "yellow"
      },
@@ -4805,7 +4805,7 @@
       "kind": "green"
      },
      {
-      "state": "yyyyyyyyyyyyyyyyyyyy",
+      "state": "grrrrgyyyygrrrrgggyy",
       "dur": 3.0,
       "kind": "yellow"
      }

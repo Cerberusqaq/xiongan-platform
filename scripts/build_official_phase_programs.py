@@ -189,7 +189,10 @@ def build_all():
                 st = build_state(tid, ct, arms, dirs_want, turns)
                 built.append((st, float(g), 'green'))
                 if ph.get('yellow'):
-                    built.append(('y' * n, float(ph['yellow']), 'yellow'))
+                    # 黄灯只针对该相位正在放行的绿灯（G）变黄，其余方向保持红，
+                    # 与真实信号机一致（不做整路口全黄）。
+                    yl = ''.join('y' if ch == 'G' else ch for ch in st)
+                    built.append((yl, float(ph['yellow']), 'yellow'))
                 if ph.get('all_red'):
                     built.append(('r' * n, float(ph['all_red']), 'red'))
             # 该档 EW/NS 总绿时（绿灯相位按 state 中 G/g 连接的进边 compass 累加）
