@@ -4248,7 +4248,7 @@
     "ns_g": 0.0,
     "phases": [
      {
-      "state": "GGGrrgrrrrGGGrrgrrrr",
+      "state": "GGGgggrrrrGGGgggrrrr",
       "dur": 37.0,
       "kind": "green"
      },
@@ -4258,7 +4258,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrrrGGGrrgrrrrGGGrr",
+      "state": "grrrrGGGgggrrrrGGGgg",
       "dur": 37.0,
       "kind": "green"
      },
@@ -4280,7 +4280,7 @@
     "ns_g": 0.0,
     "phases": [
      {
-      "state": "GGGrrgrrrrGGGrrgrrrr",
+      "state": "GGGgggrrrrGGGgggrrrr",
       "dur": 37.0,
       "kind": "green"
      },
@@ -4290,7 +4290,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrrrGGGrrgrrrrGGGrr",
+      "state": "grrrrGGGgggrrrrGGGgg",
       "dur": 37.0,
       "kind": "green"
      },
@@ -4312,7 +4312,7 @@
     "ns_g": 0.0,
     "phases": [
      {
-      "state": "GGGrrgrrrrGGGrrgrrrr",
+      "state": "GGGgggrrrrGGGgggrrrr",
       "dur": 37.0,
       "kind": "green"
      },
@@ -4322,7 +4322,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrrrGGGrrgrrrrGGGrr",
+      "state": "grrrrGGGgggrrrrGGGgg",
       "dur": 37.0,
       "kind": "green"
      },
@@ -4457,7 +4457,7 @@
     "ns_g": 105.0,
     "phases": [
      {
-      "state": "GGrrgrrrrGGGGrrgrrrr",
+      "state": "GGgggrrrrGGGGgggrrrr",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4467,7 +4467,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrrGGGrrgrrrrrGGGrr",
+      "state": "grrrGGGgggrrrrrGGGgg",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4489,7 +4489,7 @@
     "ns_g": 105.0,
     "phases": [
      {
-      "state": "GGrrgrrrrGGGGrrgrrrr",
+      "state": "GGgggrrrrGGGGgggrrrr",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4499,7 +4499,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrrGGGrrgrrrrrGGGrr",
+      "state": "grrrGGGgggrrrrrGGGgg",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4521,7 +4521,7 @@
     "ns_g": 105.0,
     "phases": [
      {
-      "state": "GGrrgrrrrGGGGrrgrrrr",
+      "state": "GGgggrrrrGGGGgggrrrr",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4531,7 +4531,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrrGGGrrgrrrrrGGGrr",
+      "state": "grrrGGGgggrrrrrGGGgg",
       "dur": 35.0,
       "kind": "green"
      },

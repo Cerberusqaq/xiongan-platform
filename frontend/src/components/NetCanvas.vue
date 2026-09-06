@@ -274,10 +274,9 @@ function fitView() {
 }
 
 // ── WS 实时数据 ───────────────────────────────────────────
-/** 边 pts 上离 (wx,wy) 最近线段的屏幕方向角（弧度，atan2 约定，Y 翻转取负） */
-function edgeHeadingAt(e, wx, wy) {
+/** 线段集上离 (wx,wy) 最近线段的屏幕方向角（弧度，atan2 约定，Y 翻转取负） */
+function polyHeadingAt(P, wx, wy) {
   let best = Infinity, ang = 0
-  const P = e.pts
   for (let i = 0; i < P.length - 1; i++) {
     const ax = P[i][0], ay = P[i][1], bx = P[i + 1][0], by = P[i + 1][1]
     const dx = bx - ax, dy = by - ay
@@ -291,15 +290,30 @@ function edgeHeadingAt(e, wx, wy) {
   return ang
 }
 
-/** 车辆初始朝向：优先按所在车道边的切线方向——SUMO 对刚生成（depart 瞬间）
-    车辆的角度不可靠（常为默认 0），第一帧位移为零也无法用移动方向推导；
-    找不到边（连接器上）时回退 SUMO angle（Y 翻转取负） */
+/** 边 pts 上离 (wx,wy) 最近线段的屏幕方向角（历史兼容：无车道几何时用边轴线） */
+function edgeHeadingAt(e, wx, wy) {
+  return polyHeadingAt(e.pts, wx, wy)
+}
+
+/** 车辆初始朝向：优先按"所在车道 laneShape"的切线——车辆停在自己的真实
+ *  车道中心线上，用车道形状取方向才与画布车道完全一致（净平滑后轴线/相邻
+ *  45° 臂可能干扰最近点，导致排队车头斜 45°）；
+ *  无 laneShapes 时回退边轴线；lane 是内部道/找不到时回退 SUMO angle（Y 翻转取负）。
+ */
 function initHeading(v) {
   if (v.lane) {
-    const lp = v.lane.split('_')
-    lp.pop()
-    const e = edgeMap.get(lp.join('_'))
-    if (e && e.pts && e.pts.length >= 2) return edgeHeadingAt(e, v.x, v.y)
+    const parts = v.lane.split('_')
+    const tail = parts.pop()
+    const e = edgeMap.get(parts.join('_'))
+    if (e) {
+      const ls = e.laneShapes
+      if (ls && ls.length && tail !== '' && /^\d+$/.test(tail)) {
+        const laneIdx = Math.min(ls.length - 1, Number(tail))
+        const shp = ls[laneIdx]
+        if (shp && shp.length >= 2) return polyHeadingAt(shp, v.x, v.y)
+      }
+      if (e.pts && e.pts.length >= 2) return edgeHeadingAt(e, v.x, v.y)
+    }
   }
   return -((v.angle || 0) * Math.PI) / 180
 }
