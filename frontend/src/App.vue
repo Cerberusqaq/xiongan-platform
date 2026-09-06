@@ -63,7 +63,7 @@ let timers = []
 let drag = null
 let autoStarted = false   // 页面加载自动启动默认演示（仅一次）
 
-/** 评委开箱即用：自动以默认配置启动 base_network + 默认车流 + 方案二（AI 模式），5× 速度 */
+/** 评委开箱即用：自动以默认配置启动 base_network(20路口) + 默认车流 + 官方方案(mappo优化)，5× 速度 */
 async function autoStartDefault() {
   if (autoStarted || sim.status !== 'idle') return
   autoStarted = true
@@ -77,8 +77,8 @@ async function autoStartDefault() {
       netPath: b.net_path,
       routes: match ? [match] : [],
       addFiles: adds ? [adds] : [],
-      scheme: 'scheme_2',
-      schemeParams: { mode: 'auto', obs_mode: 'agnostic', mappo_weights: 'models/weights/mappo_agnostic_full', stgcn_weights: 'models/weights/stgcn.pt' },
+      scheme: 'official',          // 默认官方方案（mappo优化）
+      schemeParams: { mode: 'auto', decision_step: 60 },
     })
     sim.setSpeed(5).catch(() => {})
   } catch (e) {
@@ -161,12 +161,20 @@ function resetPanel(kind) {
 }
 
 function handleStart({ net, routes, addFiles, scheme, scenario }) {
+  const s = scheme || 'scheme_2'
+  // 方案特定默认参数：官方方案走三档配时切换（auto 启发式选档，60s 决策）；
+  // 方案二(MAPPO)沿用 agnostic 权重；其余方案空参数即可
+  const schemeParams = s === 'official'
+    ? { mode: 'auto', decision_step: 60 }
+    : s === 'scheme_2'
+      ? { mode: 'auto', obs_mode: 'agnostic', mappo_weights: 'models/weights/mappo_agnostic_full', stgcn_weights: 'models/weights/stgcn.pt' }
+      : {}
   sim.start({
     netPath: net.net_path,
     routes,
     addFiles,
-    scheme: scheme || 'scheme_2',
-    schemeParams: { mode: 'auto', obs_mode: 'agnostic', mappo_weights: 'models/weights/mappo_agnostic_full', stgcn_weights: 'models/weights/stgcn.pt' },
+    scheme: s,
+    schemeParams,
     rightTurnGreen: !!ui.settings.rightTurnGreen,
     scenario: scenario || '',
   }).catch((e) => console.warn('[start] 启动失败:', e.message))

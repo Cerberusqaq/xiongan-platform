@@ -40,8 +40,14 @@ const CUSTOM_DEFS = [
     fmt: (d) => d ? `${d.id} · 排队${d.queue}` : '暂无', desc: '排队最多的路口，点击定位' },
 ]
 
-const enabledCustom = computed(() =>
-  CUSTOM_DEFS.filter((d) => (ui.settings.customMetrics || []).includes(d.key)))
+// 显示顺序 = 用户启用的先后（默认评委顺序：最堵塞道路 → 最堵塞路口 → 完成率），
+// 而非 CUSTOM_DEFS 定义顺序，保证"基础四卡 + 这些自定义卡"的阅读顺序可控
+const enabledCustom = computed(() => {
+  const byKey = new Map(CUSTOM_DEFS.map((d) => [d.key, d]))
+  return (ui.settings.customMetrics || [])
+    .map((k) => byKey.get(k))
+    .filter(Boolean)
+})
 
 const spotlight = ref({})
 let spotlightTimer = null

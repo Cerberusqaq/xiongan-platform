@@ -13,7 +13,7 @@ const ui = useUiStore()
 
 const speed = ref(5)      // 默认 5×：评委/演示更快看到车流动
 const selected = ref('')
-const scheme = ref('webster')   // 默认：案例 Webster 最优配时（demo 路口自动按流量算；无流量则等于固定配时基线）
+const scheme = ref('official')   // 默认：官方方案（base_network 20 路口专属，评委演示主方案）
 const fileInput = ref(null)
 
 // 评委开箱即用：路网列表就绪后默认选中 base_network（用户可随时换）
@@ -83,10 +83,14 @@ const schemeOptions = computed(() => {
   if (isBaseNet.value) return SCHEMES.filter((s) => !s.demo)
   return SCHEMES.filter((s) => !s.demo && !s.base)
 })
-// 切路网时方案不适用则回退（demo→禁止官方；非 base→禁止官方；demo 与 webster 联动）
+// 切路网时方案不适用则回退：demo 网无官方方案→webster；非 base 且非 demo 网→scheme_2。
+// 路网未就绪（nets 未加载/未选中）时保持默认官方方案不动，避免空载误回退。
 watch([isDemoNet, isBaseNet], ([demo, base]) => {
-  if (demo && scheme.value === 'webster') return          // demo 保留 webster
-  if (!base && scheme.value === 'official') scheme.value = 'scheme_2'
+  if (!currentNet.value) return                     // 列表/选中未就绪：保留默认
+  if (demo && scheme.value === 'official') { scheme.value = 'webster'; return }
+  if (demo && scheme.value === 'webster') return    // demo 保留 webster
+  if (!base && !demo && scheme.value === 'official') { scheme.value = 'scheme_2'; return }
+  if (!base && scheme.value === 'official') { scheme.value = 'scheme_2'; return }
   if (!demo && scheme.value === 'webster') scheme.value = 'scheme_2'
 }, { immediate: true })
 

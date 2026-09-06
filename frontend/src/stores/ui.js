@@ -78,17 +78,11 @@ function fitPair(metricsH, schemeH, cap) {
 }
 
 function loadLayout() {
+  // 评审/演示要求：每次启动都用固定默认布局（不恢复上次拖拽尺寸）
   const def = viewDefaults()
   try {
-    const raw = JSON.parse(localStorage.getItem('ui-layout') || '{}')
-    const out = { ...def, ...raw }
-    out.leftW = clamp('leftW', out.leftW)
-    out.rightW = clamp('rightW', out.rightW)
-    out.bottomH = Math.max(BOTTOM_MIN, Math.min(clampRanges().bottomH[1], maxBottom(), out.bottomH))
-    const pair = fitPair(out.metricsH, out.schemeH, maxSum(out.bottomH))
-    out.metricsH = pair.metricsH
-    out.schemeH = pair.schemeH
-    return out
+    const pair = fitPair(def.metricsH, def.schemeH, maxSum(def.bottomH))
+    return { ...def, metricsH: pair.metricsH, schemeH: pair.schemeH }
   } catch {
     return { ...def }
   }
@@ -105,51 +99,37 @@ const SETTINGS_DEFAULTS = {
   rightTurnGreen: false,  // 右转常绿：启动时把右转信号恒为绿灯（运行时覆写，不改相位结构）
   hideRightTurnLights: false, // 隐藏右转灯：右转常绿时隐藏右转灯头显示（子选项）
   showTurnLights: false,  // 显示左转/掉头灯：默认关闭=隐藏（评审视觉简化；仅 UI，不影响真实控制）
-  lightMode: 'framed',   // 信号灯样式：solid 实心圆 | framed 圆框箭头（默认） | bare 无框箭头
-  minimalLights: false,  // 极简模式：每车道仅显示一个方向的信号灯（仅 lightMode=bare 时可开）
+  lightMode: 'bare',     // 信号灯样式：solid 实心圆 | framed 圆框箭头 | bare 无框箭头（评委默认）
+  minimalLights: true,   // 极简模式：每车道仅显示一个方向的信号灯（评委默认，配合 bare）
   leftMode: 'stacked',   // 左栏模式：stacked 堆叠（默认）| tabs 单栏切换
   leftTab: 'metrics',    // 单栏模式当前子栏：metrics | scheme | event
-  customMetrics: [],   // 自定义指标默认全关：默认只显示基础四卡（在网车辆/平均速度/平均等待/平均排队）
+  // 指标卡默认：基础四卡 + 最堵塞道路 + 最堵塞路口 + 完成率（评委默认，顺序即显示顺序）
+  customMetrics: ['most_congested_edge', 'most_congested_tls', 'completion_rate'],
 }
-
-// 设置版本：升级时用于迁移/清除旧版遗留字段（如自定义指标默认值变更）
-const SETTINGS_VER = 2
 
 function loadSettings() {
-  try {
-    const raw = JSON.parse(localStorage.getItem('ui-settings') || '{}')
-    // 版本迁移：v2 起自定义指标默认全关（只显示基础四卡），
-    // 清除旧版遗留的 customMetrics，避免 localStorage 旧值覆盖新默认
-    if (raw.__ver !== SETTINGS_VER) {
-      delete raw.customMetrics
-      raw.__ver = SETTINGS_VER
-    }
-    return { ...SETTINGS_DEFAULTS, ...raw }
-  } catch {
-    return { ...SETTINGS_DEFAULTS }
-  }
+  // 评审/演示要求：每次启动都用固定默认（不恢复上次关闭时的设置）
+  return { ...SETTINGS_DEFAULTS }
 }
 
-/** UI 状态：主题（深/浅）+ 视图（普通/专业）+ 面板尺寸（可拖拽，持久化）+ 设置 */
+/** UI 状态：主题（深/浅）+ 视图（普通/专业）+ 面板尺寸 + 设置。
+ *  评审要求：全部为固定默认，不持久化、不恢复上次关闭时的状态。 */
 export const useUiStore = defineStore('ui', {
   state: () => ({
-    theme: localStorage.getItem('ui-theme') || 'dark',
-    viewMode: localStorage.getItem('ui-view') || 'normal', // normal | pro
-    scenario: '',              // 交通场景选择（启动参数，画布右上角选择）
+    theme: 'dark',
+    viewMode: 'pro',             // 默认专业模式（评委）
+    scenario: '',                // 交通场景选择（启动参数，画布右上角选择）
     settings: loadSettings(),
-    testMode: false,           // 测试车辆选路模式（画布点击选边）
-    spotlight: null,           // 跨组件聚焦请求 {type:'vehicle'|'edge'|'node', id}（NetCanvas 监听）
+    testMode: false,             // 测试车辆选路模式（画布点击选边）
+    spotlight: null,             // 跨组件聚焦请求 {type:'vehicle'|'edge'|'node', id}（NetCanvas 监听）
     ...loadLayout(),
   }),
   actions: {
     setViewMode(mode) {
       this.viewMode = mode
-      localStorage.setItem('ui-view', mode)
     },
     setSetting(key, val) {
       this.settings[key] = val
-      this.settings.__ver = SETTINGS_VER
-      localStorage.setItem('ui-settings', JSON.stringify(this.settings))
     },
     setTestMode(v) { this.testMode = v },
     setSpotlight(sp) { this.spotlight = sp },
@@ -160,7 +140,6 @@ export const useUiStore = defineStore('ui', {
 
     setTheme(theme) {
       this.theme = theme
-      localStorage.setItem('ui-theme', theme)
       this.apply()
     },
     toggleTheme() { this.setTheme(this.theme === 'dark' ? 'light' : 'dark') },
@@ -192,7 +171,6 @@ export const useUiStore = defineStore('ui', {
       const pair = fitPair(this.metricsH, this.schemeH, maxSum(this.bottomH))
       this.metricsH = pair.metricsH
       this.schemeH = pair.schemeH
-      this._saveLayout()
     },
     resetLayout() {
       const d = viewDefaults()
@@ -204,7 +182,6 @@ export const useUiStore = defineStore('ui', {
       const pair = fitPair(this.metricsH, this.schemeH, maxSum(this.bottomH))
       this.metricsH = pair.metricsH
       this.schemeH = pair.schemeH
-      this._saveLayout()
     },
     /** 双击某个手柄复位：恢复为该面板的视口比例默认（而非写死数值） */
     resetPanel(kind) {
@@ -219,13 +196,9 @@ export const useUiStore = defineStore('ui', {
       } else {
         this[key] = d[key]
       }
-      this._saveLayout()
     },
     _saveLayout() {
-      localStorage.setItem('ui-layout', JSON.stringify({
-        leftW: this.leftW, rightW: this.rightW, bottomH: this.bottomH,
-        metricsH: this.metricsH, schemeH: this.schemeH,
-      }))
+      // 不再持久化：布局只保存在内存，刷新/重启即恢复固定默认
     },
   },
 })
