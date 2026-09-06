@@ -431,15 +431,19 @@ function draw(t) {
   const contOff = (x) => (x && x.off ? Math.max(3.5, x.off * S) : 0)
   const bedW = Math.max(3.5, 3.2 * S)
   for (const e of edges.value) {
+    // 双向分离偏移 offPx：仅用于"无真实车道几何"时的公式回退绘制；
+    // 有 laneShapes 时道路/车道/灯全部用 SUMO 真实几何原位绘制——
+    // 再整体平移会使平滑弯道（曲率小）的内侧等距自交成"过山车麻花"（netedit 平滑后复现）。
     const offPx = e.off ? Math.max(3.5, e.off * S) : 0
     const n = e.lanes
     const hasReal = e.laneShapes && e.laneShapes.length === n
+    const realOff = hasReal ? 0 : offPx     // 真实车道几何：不再叠加双向分离平移
     const shapes = (off) => e.laneShapes.map((sh) => screenShape(sh, off))
     // 路面（车道级真实几何铺满，含渐变/弯曲）
     ctx.strokeStyle = c.edge
     ctx.lineWidth = hasReal ? bedW : Math.max(3.5, (n * 3.2 + 1.4) * S)
     if (hasReal) {
-      for (const P of shapes(offPx)) tracePoly(ctx, P)
+      for (const P of shapes(realOff)) tracePoly(ctx, P)
     } else {
       tracePoly(ctx, polyScreen(e, offPx, 0))
     }
@@ -449,8 +453,8 @@ function draw(t) {
       // 真实车道 shape 先截断两端，再取相邻中线
       const T = e.laneShapes.map((sh) => trimPolyline(sh, 8))
       for (let i = 1; i < n; i++) {
-        const A = screenShape(T[i - 1], offPx)
-        const B = screenShape(T[i], offPx)
+        const A = screenShape(T[i - 1], realOff)
+        const B = screenShape(T[i], realOff)
         const mid = A.map((p, k) => [(p[0] + (B[k]?.[0] ?? p[0])) / 2, (p[1] + (B[k]?.[1] ?? p[1])) / 2])
         ctx.strokeStyle = c.edgeHi
         tracePoly(ctx, mid)
@@ -464,7 +468,7 @@ function draw(t) {
     }
     // 路口连接（同向延续边：仅路面粗线补缺口，路口内不画分界线）
     const laneEnd = (E, i, off) => {
-      const P = E.laneShapes ? screenShape(E.laneShapes[i], off) : polyScreen(E, off, (i - (E.lanes - 1) / 2) * laneSep)
+      const P = E.laneShapes && E.laneShapes[i] ? screenShape(E.laneShapes[i], 0) : polyScreen(E, off, (i - (E.lanes - 1) / 2) * laneSep)
       return P
     }
     const bridge = (C, fromSide) => {
@@ -499,7 +503,10 @@ function draw(t) {
     const e = edgeMap.get(eid)
     if (!e) continue
     const eOff = e.off ? Math.max(3.5, e.off * S) : 0
-    const P = polyScreen(e, eOff, 0)
+    // 真实车道几何原位描边（不再叠加 offPx，见道路绘制注释）
+    const P = e.laneShapes && e.laneShapes.length
+      ? screenShape(e.laneShapes[Math.floor(e.laneShapes.length / 2)], 0)
+      : polyScreen(e, eOff, 0)
     ctx.strokeStyle = ev.color
     ctx.globalAlpha = 0.38
     ctx.lineWidth = Math.max(5, 3.2 * e.lanes * S + 3)
@@ -642,11 +649,12 @@ function draw(t) {
       else drawArrowShape(lx, ly, ang, col, s)
     }
   }
-  // 取某条车道的屏幕空间几何（真实 lane shape 或公式回退），供停车线定位
+  // 取某条车道的屏幕空间几何（真实 lane shape 或公式回退），供停车线定位。
+  // 真实 lane shape 已是 SUMO 原位几何，不再叠加 offPx（避免平滑弯道二次平移自交成环）
   const laneEndPts = (e, laneIdx) => {
     const offPx = e.off ? Math.max(3.5, e.off * S) : 0
     return e.laneShapes && e.laneShapes[laneIdx]
-      ? screenShape(e.laneShapes[laneIdx], offPx)
+      ? screenShape(e.laneShapes[laneIdx], 0)
       : polyScreen(e, offPx, (laneIdx - (e.lanes - 1) / 2) * laneSep)
   }
   // 停车线偏移 +1.0 车道宽（即"离停车线 -1 车道宽"）：越过停车线朝路口内 1 个车道宽，
@@ -835,7 +843,10 @@ function draw(t) {
           ctx.strokeStyle = c.accent
           ctx.globalAlpha = 0.5
           ctx.lineWidth = Math.max(4, 3.2 * S + 2)
-          tracePoly(ctx, polyScreen(re, rOff, 0))
+          // 真实车道几何原位；无真实几何才用公式回退（offPx）
+          tracePoly(ctx, re.laneShapes && re.laneShapes[0]
+            ? screenShape(re.laneShapes[0], 0)
+            : polyScreen(re, rOff, 0))
           ctx.globalAlpha = 1
         }
         ctx.setLineDash([])
@@ -873,7 +884,9 @@ function draw(t) {
         ctx.strokeStyle = c.accent
         ctx.globalAlpha = 0.45
         ctx.lineWidth = Math.max(5, 3.2 * se.lanes * S + 3)
-        tracePoly(ctx, polyScreen(se, sOff, 0))
+        tracePoly(ctx, se.laneShapes && se.laneShapes[0]
+          ? screenShape(se.laneShapes[0], 0)
+          : polyScreen(se, sOff, 0))
         ctx.globalAlpha = 1
       }
     }
@@ -889,7 +902,9 @@ function draw(t) {
       const re = edgeMap.get(rid)
       if (!re) continue
       const rOff = re.off ? Math.max(3.5, re.off * S) : 0
-      tracePoly(ctx, polyScreen(re, rOff, 0))
+      tracePoly(ctx, re.laneShapes && re.laneShapes[0]
+        ? screenShape(re.laneShapes[0], 0)
+        : polyScreen(re, rOff, 0))
     }
     ctx.setLineDash([])
     ctx.globalAlpha = 1
