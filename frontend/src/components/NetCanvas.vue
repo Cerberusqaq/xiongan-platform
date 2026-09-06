@@ -541,39 +541,47 @@ function draw(t) {
 
   // 1.1) 双向中央分隔：中缝空隙（画布底色带）+ 双黄线。
   // 真实车道几何是原位的——两方向内侧车道在 SUMO 里贴齐（无天然空位），
-  // 所以"空隙"用画布底色沿两方向真中线画一条中央带实现：
-  // 路面本身不动（车不偏、不麻花），中央带两侧边缘再各画一条黄实线组成双黄线。
+  // 所以"空隙"用画布底色沿两方向真中线画一条较窄的中央带实现：
+  // 路面本身不动（车不偏、不麻花）；中央带两侧边缘再各画一条黄实线组成双黄线。
+  // 空隙刻意收窄（世界≈0.9m，每侧约 0.45m，明显小于半条车道），避免把内侧车道明显遮窄；
+  // 同时按缩放淡出：整体缩小（fit≈0.7 或更小）时中央线成细碎噪声且满屏泛黄，
+  // 这里随 S 从 0.8→1.8 线性淡入：缩小视图保持干净、放大到街道级自动重现。
   if (ui.settings.showMedian && medianPairs.length) {
-    for (const e of medianPairs) {
-      const p = edgeMap.get(e.partnerId)
-      const hasRealPair = e.laneShapes && e.laneShapes.length === e.lanes &&
-        p && p.laneShapes && p.laneShapes.length === p.lanes
-      const baseWorld = (e.mid && e.mid.length >= 2) ? trimPolyline(e.mid, 8) : trimPolyline(e.pts, 8)
-      if (hasRealPair && baseWorld.length >= 2) {
-        const gapPx = Math.max(3, 1.6 * S)   // 中央空隙总宽（世界≈1.6m，随缩放）
-        const ylW = Math.max(1.5, 0.6 * S)   // 单条黄线宽
-        const ylOff = gapPx / 2 + ylW / 2    // 黄线居中：紧贴空隙外侧、完全落在各自路面
-        // 1) 中缝空隙：画布底色带（在两侧路面之上，作为两方向之间的视觉空位）
-        ctx.strokeStyle = c.bg
-        ctx.lineWidth = gapPx
-        ctx.lineCap = 'butt'
-        tracePoly(ctx, screenShape(baseWorld, 0, 0))
-        // 2) 双黄线：空隙两侧各一条黄实线
-        ctx.strokeStyle = c.roadYellow
-        ctx.lineWidth = ylW
-        ctx.lineCap = 'round'
-        tracePoly(ctx, screenShape(baseWorld, ylOff))
-        tracePoly(ctx, screenShape(baseWorld, -ylOff))
-      } else {
-        // 无真实车道几何的回退：单条虚线
-        ctx.strokeStyle = c.borderStrong
-        ctx.lineWidth = Math.max(1, S * 0.9)
-        ctx.setLineDash([5, 4])
-        tracePoly(ctx, screenShape(baseWorld, 0, 0))
-        ctx.setLineDash([])
+    const medA = Math.min(1, Math.max(0, S - 0.8))
+    if (medA > 0) {
+      ctx.globalAlpha = medA
+      for (const e of medianPairs) {
+        const p = edgeMap.get(e.partnerId)
+        const hasRealPair = e.laneShapes && e.laneShapes.length === e.lanes &&
+          p && p.laneShapes && p.laneShapes.length === p.lanes
+        const baseWorld = (e.mid && e.mid.length >= 2) ? trimPolyline(e.mid, 8) : trimPolyline(e.pts, 8)
+        if (hasRealPair && baseWorld.length >= 2) {
+          const gapPx = Math.max(1.5, 0.9 * S)  // 中央空隙总宽（世界≈0.9m，随缩放）
+          const ylW = Math.max(0.8, 0.3 * S)    // 单条黄线宽（贴近真实标线粗细）
+          const ylOff = gapPx / 2 + ylW / 2     // 黄线居中：紧贴空隙外侧、完全落在各自路面
+          // 1) 中缝空隙：画布底色带（在两侧路面之上，作为两方向之间的视觉空位）
+          ctx.strokeStyle = c.bg
+          ctx.lineWidth = gapPx
+          ctx.lineCap = 'butt'
+          tracePoly(ctx, screenShape(baseWorld, 0, 0))
+          // 2) 双黄线：空隙两侧各一条黄实线
+          ctx.strokeStyle = c.roadYellow
+          ctx.lineWidth = ylW
+          ctx.lineCap = 'round'
+          tracePoly(ctx, screenShape(baseWorld, ylOff))
+          tracePoly(ctx, screenShape(baseWorld, -ylOff))
+        } else {
+          // 无真实车道几何的回退：单条虚线
+          ctx.strokeStyle = c.borderStrong
+          ctx.lineWidth = Math.max(1, S * 0.9)
+          ctx.setLineDash([5, 4])
+          tracePoly(ctx, screenShape(baseWorld, 0, 0))
+          ctx.setLineDash([])
+        }
       }
+      ctx.lineCap = 'round'
+      ctx.globalAlpha = 1
     }
-    ctx.lineCap = 'round'
   }
 
   // 1.5) 扰动事件标记：受影响边高亮 + 中点脉冲圆点
