@@ -730,9 +730,11 @@ function draw(t) {
       const lk = links[i]
       const dir = lk.dir || 's'
       // 右转常绿时隐藏右转灯头：跳过右转 link（dir=r/R，来自 net.xml 连接定义）
-      if (ui.settings.hideRightTurnLights && (dir === 'r' || dir === 'R')) continue
-      // 默认隐藏左转/掉头灯（UI 过滤，不影响真实信号控制）
-      if (!ui.settings.showTurnLights && (dir === 'l' || dir === 'L' || dir === 't' || dir === 'T')) continue
+      // 注意：极简模式（每车道只画主信号 1 盏）不在此过滤——它需要在全部方向里
+      // 判断车道主方向，否则“直左/左右共享车道”会因默认隐藏左转只剩右转而误显示为右转
+      if (!minimalLights && ui.settings.hideRightTurnLights && (dir === 'r' || dir === 'R')) continue
+      // 默认隐藏左转/掉头灯（UI 过滤，不影响真实信号控制）；极简模式除外（见上）
+      if (!minimalLights && !ui.settings.showTurnLights && (dir === 'l' || dir === 'L' || dir === 't' || dir === 'T')) continue
       const key = `${lk.from_edge}|${lk.from_lane || 0}`
       if (!byLane.has(key)) byLane.set(key, [])
       const bucket = byLane.get(key)
@@ -746,10 +748,11 @@ function draw(t) {
       if (!e) continue
       // 同车道多灯按 掉头→左转→直走→右转 从左到右排列（符合现实次序）
       arr.sort((a, b) => (MOV_RANK[a.dir] ?? 9) - (MOV_RANK[b.dir] ?? 9))
-      // 极简模式：每车道仅显示一个方向的灯——从该车道所有方向中按
-      // 优先级 掉头<左转<直行<右转 取最高级（右转最高）；灯径 0.8 车道宽，居车道中线
+      // 极简模式：每车道仅显示一个方向的灯——取该车道“主信号方向”
+      // 优先级 直行 > 左转 > 右转 > 掉头（s/l 优先于 r：直左/左右共享车道不误显示为右转，
+      // 纯右转专用道 lane0 无 s/l 时自然落到 r；修复 E6_13 这类 lane1 同挂 r/l/t 时的“双右转”）
       if (minimalLights) {
-        const MIN_RANK = { r: 3, R: 3, s: 2, S: 2, l: 1, L: 1, t: 0, T: 0 }
+        const MIN_RANK = { s: 3, S: 3, l: 2, L: 2, r: 1, R: 1, t: 0, T: 0 }
         const best = arr.reduce((b, x) =>
           ((MIN_RANK[x.dir] ?? -1) > (MIN_RANK[b.dir] ?? -1) ? x : b))
         arr.length = 0

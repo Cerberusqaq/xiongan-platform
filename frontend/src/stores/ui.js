@@ -101,7 +101,7 @@ const SETTINGS_DEFAULTS = {
   showTurnLights: false,  // 显示左转/掉头灯：默认关闭=隐藏（评审视觉简化；仅 UI，不影响真实控制）
   lightMode: 'bare',     // 信号灯样式：solid 实心圆 | framed 圆框箭头 | bare 无框箭头（评委默认）
   minimalLights: true,   // 极简模式：每车道仅显示一个方向的信号灯（评委默认，配合 bare）
-  leftMode: 'stacked',   // 左栏模式：stacked 堆叠（默认）| tabs 单栏切换
+  leftMode: 'tabs',      // 左栏模式：stacked 堆叠 | tabs 单栏切换（评委默认=单栏页签）
   leftTab: 'metrics',    // 单栏模式当前子栏：metrics | scheme | event
   // 指标卡默认：基础四卡 + 最堵塞道路 + 最堵塞路口 + 完成率（评委默认，顺序即显示顺序）
   customMetrics: ['most_congested_edge', 'most_congested_tls', 'completion_rate'],
