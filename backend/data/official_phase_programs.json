@@ -413,9 +413,9 @@
     "range": "7:00-9:00",
     "cycle_official": 80,
     "cycle_built": 80.0,
-    "ew_ratio": 0.249,
-    "ns_ratio": 0.751,
-    "ew_g": 82.0,
+    "ew_ratio": 0.0,
+    "ns_ratio": 1.0,
+    "ew_g": 0.0,
     "ns_g": 247.0,
     "phases": [
      {
@@ -429,7 +429,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrrrrGGggGG",
+      "state": "grrrrrGGggrr",
       "dur": 41.0,
       "kind": "green"
      },
@@ -445,9 +445,9 @@
     "range": "14:30-16:30",
     "cycle_official": 80,
     "cycle_built": 80.0,
-    "ew_ratio": 0.222,
-    "ns_ratio": 0.778,
-    "ew_g": 74.0,
+    "ew_ratio": 0.0,
+    "ns_ratio": 1.0,
+    "ew_g": 0.0,
     "ns_g": 259.0,
     "phases": [
      {
@@ -461,7 +461,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrrrrGGggGG",
+      "state": "grrrrrGGggrr",
       "dur": 37.0,
       "kind": "green"
      },
@@ -477,9 +477,9 @@
     "range": "17:30-19:30",
     "cycle_official": 80,
     "cycle_built": 80.0,
-    "ew_ratio": 0.17,
-    "ns_ratio": 0.83,
-    "ew_g": 58.0,
+    "ew_ratio": 0.0,
+    "ns_ratio": 1.0,
+    "ew_g": 0.0,
     "ns_g": 283.0,
     "phases": [
      {
@@ -493,7 +493,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrrrrGGggGG",
+      "state": "grrrrrGGggrr",
       "dur": 29.0,
       "kind": "green"
      },
@@ -2105,10 +2105,10 @@
     "range": "7:00-9:00",
     "cycle_official": 145,
     "cycle_built": 145.0,
-    "ew_ratio": 0.518,
-    "ns_ratio": 0.482,
-    "ew_g": 928.0,
-    "ns_g": 864.0,
+    "ew_ratio": 0.523,
+    "ns_ratio": 0.477,
+    "ew_g": 736.0,
+    "ns_g": 672.0,
     "phases": [
      {
       "state": "GGGGGGggrrrggrrrrGGGGGGgrrrrr",
@@ -2131,7 +2131,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGGGGGGGGGGGGGGGGggrrrrgrrrrr",
+      "state": "grrrrrGGGGGggrrrrggrrrrgrrrrr",
       "dur": 32.0,
       "kind": "green"
      },
@@ -2147,10 +2147,10 @@
     "range": "14:30-16:30",
     "cycle_official": 145,
     "cycle_built": 145.0,
-    "ew_ratio": 0.518,
-    "ns_ratio": 0.482,
-    "ew_g": 928.0,
-    "ns_g": 864.0,
+    "ew_ratio": 0.523,
+    "ns_ratio": 0.477,
+    "ew_g": 736.0,
+    "ns_g": 672.0,
     "phases": [
      {
       "state": "GGGGGGggrrrggrrrrGGGGGGgrrrrr",
@@ -2173,7 +2173,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGGGGGGGGGGGGGGGGggrrrrgrrrrr",
+      "state": "grrrrrGGGGGggrrrrggrrrrgrrrrr",
       "dur": 32.0,
       "kind": "green"
      },
@@ -2189,10 +2189,10 @@
     "range": "17:30-19:30",
     "cycle_official": 145,
     "cycle_built": 145.0,
-    "ew_ratio": 0.518,
-    "ns_ratio": 0.482,
-    "ew_g": 928.0,
-    "ns_g": 864.0,
+    "ew_ratio": 0.523,
+    "ns_ratio": 0.477,
+    "ew_g": 736.0,
+    "ns_g": 672.0,
     "phases": [
      {
       "state": "GGGGGGggrrrggrrrrGGGGGGgrrrrr",
@@ -2215,7 +2215,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGGGGGGGGGGGGGGGGggrrrrgrrrrr",
+      "state": "grrrrrGGGGGggrrrrggrrrrgrrrrr",
       "dur": 32.0,
       "kind": "green"
      },
@@ -2303,10 +2303,10 @@
     "range": "7:00-9:00",
     "cycle_official": 120,
     "cycle_built": 120.0,
-    "ew_ratio": 0.741,
-    "ns_ratio": 0.259,
+    "ew_ratio": 1.0,
+    "ns_ratio": 0.0,
     "ew_g": 361.0,
-    "ns_g": 126.0,
+    "ns_g": 0.0,
     "phases": [
      {
       "state": "GGrrggrrGGGr",
@@ -2324,7 +2324,7 @@
       "kind": "red"
      },
      {
-      "state": "rrGGggGGgrrr",
+      "state": "rrGGggrrgrrr",
       "dur": 63.0,
       "kind": "green"
      },
@@ -2345,10 +2345,10 @@
     "range": "14:30-16:30",
     "cycle_official": 90,
     "cycle_built": 90.0,
-    "ew_ratio": 0.778,
-    "ns_ratio": 0.222,
+    "ew_ratio": 1.0,
+    "ns_ratio": 0.0,
     "ew_g": 280.0,
-    "ns_g": 80.0,
+    "ns_g": 0.0,
     "phases": [
      {
       "state": "GGrrggrrGGGr",
@@ -2366,7 +2366,7 @@
       "kind": "red"
      },
      {
-      "state": "rrGGggGGgrrr",
+      "state": "rrGGggrrgrrr",
       "dur": 40.0,
       "kind": "green"
      },
@@ -2387,10 +2387,10 @@
     "range": "17:30-19:30",
     "cycle_official": 120,
     "cycle_built": 120.0,
-    "ew_ratio": 0.796,
-    "ns_ratio": 0.204,
+    "ew_ratio": 1.0,
+    "ns_ratio": 0.0,
     "ew_g": 397.0,
-    "ns_g": 102.0,
+    "ns_g": 0.0,
     "phases": [
      {
       "state": "GGrrggrrGGGr",
@@ -2408,7 +2408,7 @@
       "kind": "red"
      },
      {
-      "state": "rrGGggGGgrrr",
+      "state": "rrGGggrrgrrr",
       "dur": 51.0,
       "kind": "green"
      },
@@ -4244,7 +4244,7 @@
     "cycle_built": 80.0,
     "ew_ratio": 1.0,
     "ns_ratio": 0.0,
-    "ew_g": 666.0,
+    "ew_g": 444.0,
     "ns_g": 0.0,
     "phases": [
      {
@@ -4258,7 +4258,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGGrrGGGrrGGGrrGGGrr",
+      "state": "grrrrGGGrrgrrrrGGGrr",
       "dur": 37.0,
       "kind": "green"
      },
@@ -4276,7 +4276,7 @@
     "cycle_built": 80.0,
     "ew_ratio": 1.0,
     "ns_ratio": 0.0,
-    "ew_g": 666.0,
+    "ew_g": 444.0,
     "ns_g": 0.0,
     "phases": [
      {
@@ -4290,7 +4290,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGGrrGGGrrGGGrrGGGrr",
+      "state": "grrrrGGGrrgrrrrGGGrr",
       "dur": 37.0,
       "kind": "green"
      },
@@ -4308,7 +4308,7 @@
     "cycle_built": 80.0,
     "ew_ratio": 1.0,
     "ns_ratio": 0.0,
-    "ew_g": 666.0,
+    "ew_g": 444.0,
     "ns_g": 0.0,
     "phases": [
      {
@@ -4322,7 +4322,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGGrrGGGrrGGGrrGGGrr",
+      "state": "grrrrGGGrrgrrrrGGGrr",
       "dur": 37.0,
       "kind": "green"
      },
@@ -4451,13 +4451,13 @@
     "range": "7:00-9:00",
     "cycle_official": 76,
     "cycle_built": 76.0,
-    "ew_ratio": 0.7,
-    "ns_ratio": 0.3,
-    "ew_g": 490.0,
-    "ns_g": 210.0,
+    "ew_ratio": 0.75,
+    "ns_ratio": 0.25,
+    "ew_g": 315.0,
+    "ns_g": 105.0,
     "phases": [
      {
-      "state": "GGrrGGGrrGGGGrrGGGrr",
+      "state": "GGrrgrrrrGGGGrrgrrrr",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4467,7 +4467,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGrrGGGrrgrrrrrGGGrr",
+      "state": "grrrGGGrrgrrrrrGGGrr",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4483,13 +4483,13 @@
     "range": "14:30-16:30",
     "cycle_official": 76,
     "cycle_built": 76.0,
-    "ew_ratio": 0.7,
-    "ns_ratio": 0.3,
-    "ew_g": 490.0,
-    "ns_g": 210.0,
+    "ew_ratio": 0.75,
+    "ns_ratio": 0.25,
+    "ew_g": 315.0,
+    "ns_g": 105.0,
     "phases": [
      {
-      "state": "GGrrGGGrrGGGGrrGGGrr",
+      "state": "GGrrgrrrrGGGGrrgrrrr",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4499,7 +4499,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGrrGGGrrgrrrrrGGGrr",
+      "state": "grrrGGGrrgrrrrrGGGrr",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4515,13 +4515,13 @@
     "range": "17:30-19:30",
     "cycle_official": 76,
     "cycle_built": 76.0,
-    "ew_ratio": 0.7,
-    "ns_ratio": 0.3,
-    "ew_g": 490.0,
-    "ns_g": 210.0,
+    "ew_ratio": 0.75,
+    "ns_ratio": 0.25,
+    "ew_g": 315.0,
+    "ns_g": 105.0,
     "phases": [
      {
-      "state": "GGrrGGGrrGGGGrrGGGrr",
+      "state": "GGrrgrrrrGGGGrrgrrrr",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4531,7 +4531,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGrrGGGrrgrrrrrGGGrr",
+      "state": "grrrGGGrrgrrrrrGGGrr",
       "dur": 35.0,
       "kind": "green"
      },
@@ -4662,11 +4662,11 @@
     "cycle_built": 120.0,
     "ew_ratio": 0.486,
     "ns_ratio": 0.514,
-    "ew_g": 918.0,
-    "ns_g": 972.0,
+    "ew_g": 459.0,
+    "ns_g": 486.0,
     "phases": [
      {
-      "state": "GGGGGGGGGGGGGGGGGgGG",
+      "state": "GGGGGgrrrrGGGGGgggrr",
       "dur": 45.0,
       "kind": "green"
      },
@@ -4676,7 +4676,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrGGgGGGGgrrGGgggGG",
+      "state": "grrGGgrrrrgrrGGgggrr",
       "dur": 9.0,
       "kind": "green"
      },
@@ -4686,7 +4686,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGGGGGGGGGGGGGGGGgGG",
+      "state": "grrrrGGGGGgrrrrGGgGG",
       "dur": 45.0,
       "kind": "green"
      },
@@ -4696,7 +4696,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrGGgGGGGgrrGGgggGG",
+      "state": "grrrrgGGGGgrrrrgggGG",
       "dur": 9.0,
       "kind": "green"
      },
@@ -4714,11 +4714,11 @@
     "cycle_built": 90.0,
     "ew_ratio": 0.485,
     "ns_ratio": 0.515,
-    "ew_g": 666.0,
-    "ns_g": 708.0,
+    "ew_g": 333.0,
+    "ns_g": 354.0,
     "phases": [
      {
-      "state": "GGGGGGGGGGGGGGGGGgGG",
+      "state": "GGGGGgrrrrGGGGGgggrr",
       "dur": 33.0,
       "kind": "green"
      },
@@ -4728,7 +4728,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrGGgGGGGgrrGGgggGG",
+      "state": "grrGGgrrrrgrrGGgggrr",
       "dur": 6.0,
       "kind": "green"
      },
@@ -4738,7 +4738,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGGGGGGGGGGGGGGGGgGG",
+      "state": "grrrrGGGGGgrrrrGGgGG",
       "dur": 33.0,
       "kind": "green"
      },
@@ -4748,7 +4748,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrGGgGGGGgrrGGgggGG",
+      "state": "grrrrgGGGGgrrrrgggGG",
       "dur": 6.0,
       "kind": "green"
      },
@@ -4766,11 +4766,11 @@
     "cycle_built": 110.0,
     "ew_ratio": 0.485,
     "ns_ratio": 0.515,
-    "ew_g": 834.0,
-    "ns_g": 884.0,
+    "ew_g": 417.0,
+    "ns_g": 442.0,
     "phases": [
      {
-      "state": "GGGGGGGGGGGGGGGGGgGG",
+      "state": "GGGGGgrrrrGGGGGgggrr",
       "dur": 41.0,
       "kind": "green"
      },
@@ -4780,7 +4780,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrGGgGGGGgrrGGgggGG",
+      "state": "grrGGgrrrrgrrGGgggrr",
       "dur": 8.0,
       "kind": "green"
      },
@@ -4790,7 +4790,7 @@
       "kind": "yellow"
      },
      {
-      "state": "GGGGGGGGGGGGGGGGGgGG",
+      "state": "grrrrGGGGGgrrrrGGgGG",
       "dur": 41.0,
       "kind": "green"
      },
@@ -4800,7 +4800,7 @@
       "kind": "yellow"
      },
      {
-      "state": "grrGGgGGGGgrrGGgggGG",
+      "state": "grrrrgGGGGgrrrrgggGG",
       "dur": 8.0,
       "kind": "green"
      },

@@ -540,7 +540,11 @@ class Engine:
             logics = traci.trafficlight.getCompleteRedYellowGreenDefinition(tls_id)
             if not logics:
                 raise EngineError(1002, f"信号灯无程序: {tls_id}")
-            logic = logics[0]
+            # 必须以「当前激活程序」为基底替换（net.xml 与 add 文件可能各带一套
+            # programID，取 logics[0] 可能替换到非激活程序而看不到效果）
+            active_id = traci.trafficlight.getProgram(tls_id)
+            logic = next((lg for lg in logics if lg.programID == active_id),
+                         logics[0])
             phases = [Phase(float(dur), str(state)) for dur, state in schedule]
             new_logic = Logic(logic.programID, logic.type,
                               min(logic.currentPhaseIndex, len(phases) - 1),

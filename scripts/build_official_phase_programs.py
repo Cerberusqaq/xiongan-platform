@@ -83,14 +83,35 @@ def load_conns(net_path):
 
 
 def parse_directions(name):
-    """官方相位名 → 目标臂方位集合（罗盘词）。'东西'→{E,W} 等。"""
-    out = set()
-    for tok, cs in [('东西', {'E', 'W'}), ('南北', {'N', 'S'}),
-                    ('东北', {'NE'}), ('西南', {'SW'}),
-                    ('东南', {'SE'}), ('西北', {'NW'}),
-                    ('东', {'E'}), ('西', {'W'}), ('南', {'S'}), ('北', {'N'})]:
-        if tok in name:
-            out |= cs
+    """官方相位名 → 目标臂方位集合（罗盘词）。
+
+    关键：复合方向词（东北/东西…）须优先整体命中并**从名字中移除**，
+    避免短词（东/南）重复命中长词内部（如"东北"又被"东"再匹配一次）。
+    例："东北西南左转"→{NE,SW}；"东西向直行"→{E,W}；"东向左右转"→{E}。
+    """
+    n = name
+    out: set[str] = set()
+    combos = [('东西', {'E', 'W'}), ('南北', {'N', 'S'}),
+              ('东北', {'NE'}), ('西南', {'SW'}),
+              ('东南', {'SE'}), ('西北', {'NW'})]
+    singles = [('东', 'E'), ('西', 'W'), ('南', 'S'), ('北', 'N')]
+    changed = True
+    while changed and n:
+        changed = False
+        for tok, cset in combos:
+            if tok in n:
+                n = n.replace(tok, '', 1)
+                out |= cset
+                changed = True
+                break
+        if changed:
+            continue
+        for tok, c in singles:
+            if tok in n:
+                n = n.replace(tok, '', 1)
+                out.add(c)
+                changed = True
+                break
     if not out:
         out = set(EDGE8)      # 缺方向词（如"放行"）→ 全臂
     return out
