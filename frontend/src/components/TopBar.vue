@@ -43,6 +43,7 @@ const SCHEMES = [
   { value: 'scheme_1', label: '方案一 · 固定配时+绿波' },
   { value: 'scheme_2', label: '方案二 · MAPPO/SCOOT' },
   { value: 'scheme_3', label: '方案三 · 车端引导' },
+  { value: 'official', label: '官方方案 · mappo优化（20路口）', base: true },
   { value: 'none', label: '基线 · 固定配时' },
 ]
 
@@ -52,6 +53,7 @@ const SCHEME_LIVE = {
   scheme_1: '方案一',
   scheme_2: '方案二',
   scheme_3: '方案三',
+  official: '官方方案',
   none: '固定配时基线',
 }
 const MODE_LIVE = {
@@ -67,15 +69,24 @@ const liveSchemeText = computed(() => {
 
 const netOptions = computed(() => sim.nets)
 
-// 默认方案(webster)仅对 demo 单路口案例可用；其它路网隐藏并在已选中时回退
+// 默认方案(webster)仅对 demo 单路口案例可用；官方方案仅 base_network(20路口)可用
 const isDemoNet = computed(() => {
   const p = sim.nets.find((n) => n.net_path === selected.value)?.net_path || ''
   return /intersection_cases|(^|[/\\])demo_\d/.test(p)
 })
-const schemeOptions = computed(() => isDemoNet.value
-  ? SCHEMES
-  : SCHEMES.filter((s) => !s.demo))
-watch(isDemoNet, (demo) => {
+const isBaseNet = computed(() => {
+  const p = sim.nets.find((n) => n.net_path === selected.value)?.net_path || ''
+  return /base_network/.test(p)
+})
+const schemeOptions = computed(() => {
+  if (isDemoNet.value) return SCHEMES.filter((s) => !s.base)
+  if (isBaseNet.value) return SCHEMES.filter((s) => !s.demo)
+  return SCHEMES.filter((s) => !s.demo && !s.base)
+})
+// 切路网时方案不适用则回退（demo→禁止官方；非 base→禁止官方；demo 与 webster 联动）
+watch([isDemoNet, isBaseNet], ([demo, base]) => {
+  if (demo && scheme.value === 'webster') return          // demo 保留 webster
+  if (!base && scheme.value === 'official') scheme.value = 'scheme_2'
   if (!demo && scheme.value === 'webster') scheme.value = 'scheme_2'
 }, { immediate: true })
 

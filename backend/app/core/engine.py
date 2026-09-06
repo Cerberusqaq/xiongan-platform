@@ -523,6 +523,34 @@ class Engine:
             raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
         self._tls_phase_cache.pop(tls_id, None)
 
+    def set_tls_phase_schedule(self, tls_id: str,
+                               schedule: list[tuple[float, str]]) -> None:
+        """整程序热替换：用给定相位序列 [(时长, state), ...] 替换该信号机当前程序。
+
+        用于官方三档配时切换：每套官方配时展开成完整 SUMO 相位序列
+        （绿/yellow/all_red 相位），在运行中整体换档（保留 programID）。
+        state 串长度必须与该信号机受控连接数一致（linkIndex 升序）。
+        """
+        from traci._trafficlight import Logic
+        from sumolib.net import Phase
+        self._require_connected()
+        if not schedule:
+            return
+        try:
+            logics = traci.trafficlight.getCompleteRedYellowGreenDefinition(tls_id)
+            if not logics:
+                raise EngineError(1002, f"信号灯无程序: {tls_id}")
+            logic = logics[0]
+            phases = [Phase(float(dur), str(state)) for dur, state in schedule]
+            new_logic = Logic(logic.programID, logic.type,
+                              min(logic.currentPhaseIndex, len(phases) - 1),
+                              phases, dict(logic.subParameter or {}))
+            traci.trafficlight.setProgramLogic(tls_id, new_logic)
+        except traci.TraCIException as exc:
+            raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
+        self._tls_phase_cache.pop(tls_id, None)
+        self._tls_links_cache.pop(tls_id, None)
+
     def apply_right_turn_always_green(self) -> None:
         """右转常绿：运行时把每个信号机程序中右转 link 的状态字强制为 g（次要绿）。
 

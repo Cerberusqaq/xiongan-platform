@@ -80,18 +80,18 @@ TOOL_SCHEMAS = [
                        "required": []}}},
     {"type": "function", "function": {
         "name": "configure_algorithm",
-        "description": "设置标准化算法参数（scheme_2 的 min_green/max_green/mode、scheme_1 的 green_wave/recalc_interval、scheme_3 的 auto_reroute 等），按算法声明校验",
+        "description": "设置标准化算法参数（scheme_2 的 min_green/max_green/mode、official 官方方案的 mode/decision_step、scheme_1 的 green_wave/recalc_interval、scheme_3 的 auto_reroute 等），按算法声明校验",
         "parameters": {"type": "object",
                        "properties": {
-                           "algorithm_id": {"type": "string", "description": "算法 id：scheme_1 / scheme_2 / scheme_3"},
+                           "algorithm_id": {"type": "string", "description": "算法 id：scheme_1 / scheme_2 / scheme_3 / official"},
                            "params": {"type": "object", "description": "要设置的参数键值对"}},
                        "required": ["algorithm_id", "params"]}}},
     {"type": "function", "function": {
         "name": "algorithm_action",
-        "description": "调用标准化算法通用动作：switch_mode(切 MAPPO/SCOOT)、enable_green_wave(开绿波)、reroute_fleet(车队重路由)、add_restricted_zone(限行) 等",
+        "description": "调用标准化算法通用动作：switch_mode(切 MAPPO/SCOOT/auto)、switch_plan(官方方案切早高峰/平峰/晚高峰档)、enable_green_wave(开绿波)、reroute_fleet(车队重路由)、add_restricted_zone(限行) 等",
         "parameters": {"type": "object",
                        "properties": {
-                           "algorithm_id": {"type": "string", "description": "算法 id：scheme_1 / scheme_2 / scheme_3"},
+                           "algorithm_id": {"type": "string", "description": "算法 id：scheme_1 / scheme_2 / scheme_3 / official"},
                            "action": {"type": "string", "description": "动作名（见 /algorithms 能力清单）"},
                            "params": {"type": "object", "description": "动作参数（可选）"}},
                        "required": ["algorithm_id", "action"]}}},
