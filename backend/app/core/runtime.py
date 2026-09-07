@@ -1,5 +1,6 @@
 """应用运行时：串起会话/采集/推送/指标存储/算法方案/路网缓存。"""
 
+from app.core.arrival import ContinuousArrival
 from app.core.datacollector import DataCollector
 from app.core.engine import Engine
 from app.core.safety_net import SafetyNet
@@ -47,6 +48,7 @@ class AppRuntime:
         self.scheme = None
         self.safety_net: SafetyNet | None = None
         self.scenario: str = ""   # 当前交通场景 id（""=渐入·路网自带车流；normal=平峰等由后端密度生成）
+        self.arrival: ContinuousArrival | None = None  # 峰期持续到达器（密度场景启用）
         self.store = MetricsStore()
         self.injector: EventInjector | None = None
         self._net_path = ""
@@ -95,6 +97,10 @@ class AppRuntime:
                                              params.get("scheme_params") or {})
             if self.scheme is not None:
                 self.scheme.init()
+            # 峰期持续到达器：密度生成场景(scenario 在 SCENARIOS 中)启用，
+            # 一次性投放+预热后仍按峰期强度持续随机补车；渐入/无场景不启用。
+            if scenario in SCENARIOS:
+                self.arrival = ContinuousArrival(self.session.engine, scenario)
             # 方案无关安全网（防溢出示绿 + 死锁清空），scheme 之后每步执行
             self.safety_net = SafetyNet(self.session.engine,
                                         params.get("safety_net") or {})
@@ -111,6 +117,7 @@ class AppRuntime:
             self.collector = None
             self.injector = None
             self.scheme = None
+            self.arrival = None
             self.scenario = ""
             self._net_path = ""
             raise
@@ -127,6 +134,7 @@ class AppRuntime:
         self.collector = None
         self.scheme = None
         self.safety_net = None
+        self.arrival = None
         self.scenario = ""
         self.injector = None
         self.test_vehicle = None
@@ -171,6 +179,7 @@ class AppRuntime:
         st = self.session.status()
         st["scenario"] = self.scenario
         st["safety_net"] = self.safety_net.status() if self.safety_net else None
+        st["arrival"] = self.arrival.status() if self.arrival else None
         # 活动方案的控制器模式（如 scheme_2 的 mappo/scoot/auto），
         # 供前端顶栏实时展示 Agent / 用户运行中切换后的状态
         st["scheme_mode"] = None
@@ -194,6 +203,8 @@ class AppRuntime:
             self.scheme.on_step()
         if self.safety_net is not None:
             self.safety_net.on_step(step)
+        if self.arrival is not None:
+            self.arrival.decide(step)   # 峰期持续补车（在网软上限内）
         self._track_test_vehicle()
         data = self.collector.collect(step)
         # 每步轻量平均速度：既推给前端实时显示，也入历史供底部栏曲线
