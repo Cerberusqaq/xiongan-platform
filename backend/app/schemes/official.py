@@ -90,6 +90,7 @@ class OfficialPlansController(BaseScheme):
         self._schedules: dict[str, list] = {}  # tid -> [ [ (dur,state)... ] x3 档 ]
         self._arms: dict[str, dict] = {}       # tid -> {edge: compass}
         self._conns: dict[str, list] = {}      # tid -> [{from,lane,dir}...]
+        self._hungry: dict[str, set[int]] = {}  # tid -> 官方三档从未放行的槽位（补让行绿）
         self._plan: dict[str, int] = {}        # tid -> 当前档 0..2
         self._next_at: dict[str, int] = {}     # tid -> 下次决策步
         self._last_switch: dict[str, int] = {}  # tid -> 上次换档步（冷却防抖）
@@ -175,10 +176,13 @@ class OfficialPlansController(BaseScheme):
             entry = self._prog[tid]
             self._arms[tid] = {e: c for e, c in (entry.get("arms") or {}).items()}
             self._conns[tid] = entry.get("conns") or []
+            # 饥饿槽位：官方三档任何相位都从未放行的连接（掉头/左转/个别直行），
+            # 统一并入"有绿相位"作让行绿 g，避免最左车道/个别方向永久饿死堵路
+            self._hungry[tid] = self._find_hungry_slots(tid, entry)
             self._schedules[tid] = []
             for pi, plan in enumerate(entry.get("plans", [])):
                 sched = [(ph["dur"], ph["state"]) for ph in plan.get("phases", [])]
-                self._schedules[tid].append(self._with_uturn_green(tid, sched))
+                self._schedules[tid].append(self._with_starved_green(tid, sched))
             # 起始档：默认车流较平缓 → 选周期最短档起步（避免空放高等待），
             # 之后按实时排队自动升降档
             self._plan[tid] = self._lightest_plan(tid)
@@ -189,31 +193,44 @@ class OfficialPlansController(BaseScheme):
         self._apply_plan_silent()   # 起步档程序先落地，避免前 60s 仍是内嵌固定配时
         self._reason = f"官方库 {len(self._prog)} 路口 · 受管 {len(self._active_tls)} 信号机 · 简化mappo选档"
 
-    def _with_uturn_green(self, tid: str, sched: list) -> list:
-        """掉头常绿：把官方相位里属于掉头(U-turn)的槽位在各绿灯相置 'g'（让行绿）。
+    @staticmethod
+    def _find_hungry_slots(tid: str, entry: dict) -> set[int]:
+        """官方三档全部相位中从未出现 G/g 的槽位（完全饥饿）。
 
-        官方 xlsx 配时普遍未给最左车道掉头(t)连接设计相位 → 掉头车在排队中
-        永远等不到绿，会把最左车道堵死（如 tls17 的 E22_17 lane1 掉头）。
-        这里不动官方相位结构/周期：仅把"掉头"视作右转一样的常绿让行——
-        任意"相位内已有其他绿(G/g)"时，掉头槽位给小写 g（让行，不触发 SUMO
-        unsafe 冲突告警）；全红清空相保持全红。
-        掉头槽位按当前路网 net.xml 的 linkIndex 判定（engine.turnaround_link_indices，
-        与 state 字符槽位对齐），对每套早/平/晚档统一应用一次。
+        仅按官方库 state 判定即可：与 SUMO 受控槽位同序（引擎
+        set_tls_phase_schedule 整程序替换按 linkIndex 解释字符）。
         """
-        try:
-            turns = self.ctx.engine.turnaround_link_indices(tid)
-        except Exception:  # noqa: BLE001
-            return sched
-        if not turns:
+        conns = entry.get("conns") or []
+        n = len(conns)
+        ever = [False] * n
+        for plan in entry.get("plans", []):
+            for ph in plan.get("phases", []):
+                st = ph.get("state", "")
+                for i in range(min(len(st), n)):
+                    if st[i] in "Gg":
+                        ever[i] = True
+        return {i for i, ok in enumerate(ever) if not ok}
+
+    def _with_starved_green(self, tid: str, sched: list) -> list:
+        """饥饿槽位补让行绿：凡"相位内已有其他绿(G/g)"时把饥饿槽位置 g。
+
+        背景：官方 xlsx 配时普遍未给最左车道掉头(t)/左转(l)（个别路口连某些
+        直行，如 tls7 E3_7 SE 臂）设计相位 → 这些连接在排队中永远等不到绿，
+        会把对应车道堵死。此处不动官方相位结构/周期：视作右转一样的常绿让行
+        —— 任意"相位内已有其他绿"时给小写 g（让行，不触发 SUMO unsafe 冲突
+        告警）；黄灯/全红清空相保持原样。对每套早/平/晚档统一应用一次。
+        """
+        starved = self._hungry.get(tid)
+        if not starved:
             return sched
         out: list = []
         for dur, state in sched:
             st = list(state)
-            # 该相位除掉头外是否已有绿（全红清空相保持全红，掉头也不绿）
+            # 该相位除饥饿槽外是否已有绿（黄灯/全红清空相保持原样）
             has_green_other = any(
-                i not in turns and ch in "Gg" for i, ch in enumerate(st))
+                i not in starved and ch in "Gg" for i, ch in enumerate(st))
             if has_green_other:
-                for i in turns:
+                for i in starved:
                     if i < len(st) and st[i] not in "Gg":
                         st[i] = "g"
             out.append((dur, "".join(st)))
