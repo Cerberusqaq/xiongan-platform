@@ -63,7 +63,7 @@ let timers = []
 let drag = null
 let autoStarted = false   // 页面加载自动启动默认演示（仅一次）
 
-/** 评委开箱即用：自动以默认配置启动 base_network(20路口) + 默认车流 + 官方方案(mappo优化)，5× 速度 */
+/** 评委开箱即用：自动以默认配置启动 base_network(20路口) + 平峰车流 + 官方方案(mappo优化)，5× 速度 */
 async function autoStartDefault() {
   if (autoStarted || sim.status !== 'idle') return
   autoStarted = true
@@ -79,6 +79,7 @@ async function autoStartDefault() {
       addFiles: adds ? [adds] : [],
       scheme: 'official',          // 默认官方方案（mappo优化）
       schemeParams: { mode: 'auto', decision_step: 60 },
+      scenario: 'normal',          // 默认平峰车流（渐入需手动选择）
     })
     sim.setSpeed(5).catch(() => {})
   } catch (e) {
@@ -176,7 +177,7 @@ function handleStart({ net, routes, addFiles, scheme, scenario }) {
     scheme: s,
     schemeParams,
     rightTurnGreen: !!ui.settings.rightTurnGreen,
-    scenario: scenario || '',
+    scenario: scenario ?? 'normal',   // 默认平峰车流（'' 渐入由用户显式选择）
   }).catch((e) => console.warn('[start] 启动失败:', e.message))
 }
 function handleStop() { sim.stop().then(() => metrics.resetSession()).catch(() => {}) }

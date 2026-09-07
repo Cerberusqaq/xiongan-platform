@@ -57,9 +57,9 @@ let unsubs = []
 // 类型颜色（仅非默认类型生效，如 bus/fleet/truck/bicycle）
 const TYPE_COLORS = { bus: '#ff6b6b', fleet: '#ffa94d', truck: '#b197fc', bicycle: '#63e6be' }
 
-// 交通场景（画布右上角选择，启动参数）：''=默认车流，其余由后端按密度生成
+// 交通场景（画布右上角选择，启动参数）：''=渐入(路网自带车流)，其余由后端按密度生成
 const DEFAULT_SCENARIOS = [
-  { value: '', label: '默认车流' },
+  { value: '', label: '渐入' },
   { value: 'sparse', label: '深夜 · 低流量' },
   { value: 'normal', label: '平峰 · 中流量' },
   { value: 'peak', label: '高峰 · 高流量' },
@@ -1306,7 +1306,7 @@ onMounted(() => {
   apiGet('/simulate/scenarios').then((list) => {
     if (Array.isArray(list) && list.length) {
       scenarioOptions.value = [
-        { value: '', label: '默认车流' },
+        { value: '', label: '渐入' },
         ...list.map((s) => ({ value: s.id, label: s.label })),
       ]
     }

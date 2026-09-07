@@ -46,7 +46,7 @@ class AppRuntime:
         self.collector: DataCollector | None = None
         self.scheme = None
         self.safety_net: SafetyNet | None = None
-        self.scenario: str = ""   # 当前交通场景 id（""=默认车流）
+        self.scenario: str = ""   # 当前交通场景 id（""=渐入·路网自带车流；normal=平峰等由后端密度生成）
         self.store = MetricsStore()
         self.injector: EventInjector | None = None
         self._net_path = ""
@@ -79,7 +79,7 @@ class AppRuntime:
                     (params.get("route_files") or [None])[0])
                 params = {**params, "route_files": [gen],
                           "warmup": WARMUP_STEPS}
-            except Exception:  # noqa: BLE001 生成失败回退默认车流，不阻塞启动
+            except Exception:  # noqa: BLE001 生成失败回退渐入(路网自带车流)，不阻塞启动
                 scenario = ""
         else:
             scenario = "" if scenario == "none" else scenario

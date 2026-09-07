@@ -118,7 +118,7 @@ export const useUiStore = defineStore('ui', {
   state: () => ({
     theme: 'dark',
     viewMode: 'pro',             // 默认专业模式（评委）
-    scenario: '',                // 交通场景选择（启动参数，画布右上角选择）
+    scenario: 'normal',          // 交通场景选择（启动参数，画布右上角选择）——默认平峰
     settings: loadSettings(),
     testMode: false,             // 测试车辆选路模式（画布点击选边）
     spotlight: null,             // 跨组件聚焦请求 {type:'vehicle'|'edge'|'node', id}（NetCanvas 监听）
