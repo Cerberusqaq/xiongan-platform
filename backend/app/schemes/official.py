@@ -178,7 +178,7 @@ class OfficialPlansController(BaseScheme):
             self._schedules[tid] = []
             for pi, plan in enumerate(entry.get("plans", [])):
                 sched = [(ph["dur"], ph["state"]) for ph in plan.get("phases", [])]
-                self._schedules[tid].append(sched)
+                self._schedules[tid].append(self._with_uturn_green(tid, sched))
             # 起始档：默认车流较平缓 → 选周期最短档起步（避免空放高等待），
             # 之后按实时排队自动升降档
             self._plan[tid] = self._lightest_plan(tid)
@@ -188,6 +188,36 @@ class OfficialPlansController(BaseScheme):
             return
         self._apply_plan_silent()   # 起步档程序先落地，避免前 60s 仍是内嵌固定配时
         self._reason = f"官方库 {len(self._prog)} 路口 · 受管 {len(self._active_tls)} 信号机 · 简化mappo选档"
+
+    def _with_uturn_green(self, tid: str, sched: list) -> list:
+        """掉头常绿：把官方相位里属于掉头(U-turn)的槽位在各绿灯相置 'g'（让行绿）。
+
+        官方 xlsx 配时普遍未给最左车道掉头(t)连接设计相位 → 掉头车在排队中
+        永远等不到绿，会把最左车道堵死（如 tls17 的 E22_17 lane1 掉头）。
+        这里不动官方相位结构/周期：仅把"掉头"视作右转一样的常绿让行——
+        任意"相位内已有其他绿(G/g)"时，掉头槽位给小写 g（让行，不触发 SUMO
+        unsafe 冲突告警）；全红清空相保持全红。
+        掉头槽位按当前路网 net.xml 的 linkIndex 判定（engine.turnaround_link_indices，
+        与 state 字符槽位对齐），对每套早/平/晚档统一应用一次。
+        """
+        try:
+            turns = self.ctx.engine.turnaround_link_indices(tid)
+        except Exception:  # noqa: BLE001
+            return sched
+        if not turns:
+            return sched
+        out: list = []
+        for dur, state in sched:
+            st = list(state)
+            # 该相位除掉头外是否已有绿（全红清空相保持全红，掉头也不绿）
+            has_green_other = any(
+                i not in turns and ch in "Gg" for i, ch in enumerate(st))
+            if has_green_other:
+                for i in turns:
+                    if i < len(st) and st[i] not in "Gg":
+                        st[i] = "g"
+            out.append((dur, "".join(st)))
+        return out
 
     # ── 每步调度 ────────────────────────────────────────────
 

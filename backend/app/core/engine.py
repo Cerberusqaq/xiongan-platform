@@ -506,6 +506,16 @@ class Engine:
         m = self._conn_dir_map.get(tls_id, {})
         return sorted(i for i, d in m.items() if d in ("r", "R"))
 
+    def turnaround_link_indices(self, tls_id: str) -> list[int]:
+        """该信号机状态字中属于掉头(U-turn)的字符下标（全局槽位序，与 state_str 对齐）。
+
+        dir='t'/'T'。官方配时普遍未给最左车道掉头设计相位 → 掉头车会饿死堵路，
+        控制器(官方方案)把这类槽位在各绿灯相置小写 'g'(让行绿)做"掉头常绿"。
+        """
+        self._load_conn_dir_map()
+        m = self._conn_dir_map.get(tls_id, {})
+        return sorted(i for i, d in m.items() if d in ("t", "T"))
+
     def _tls_phase_count(self, tls_id: str) -> int:
         """当前信号方案的相位总数（缓存，避免高频调用昂贵定义接口）。"""
         cached = self._tls_phase_cache.get(tls_id)
