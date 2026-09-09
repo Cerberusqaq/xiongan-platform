@@ -134,7 +134,7 @@ async function onUpload(ev) {
   <header class="topbar">
     <div class="brand">
       <span class="brand-dot" />
-      <span class="brand-name">车路云协同管控平台</span>
+      <span class="brand-name">灵动交通可视化平台</span>
     </div>
 
     <div class="group">
