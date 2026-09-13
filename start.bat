@@ -1,52 +1,96 @@
 @echo off
-rem ============================================================
-rem  车路云协同管控平台（桌面测试版）- 一键启动
-rem  编码：本文件为 ANSI/GBK（中文系统原生），无需 chcp
-rem  后端：backend（.env 决定 LLM：智谱免费API / 本地Ollama）
-rem  前端：frontend（Vue 3 + Vite，端口 5173，/api 与 /ws 代理到 8000）
-rem ============================================================
-set "FE=%~dp0frontend"
-set "BE=%~dp0backend"
+setlocal EnableExtensions
+set "ROOT=%~dp0"
+set "BE=%ROOT%backend"
+set "FE=%ROOT%frontend"
 
-title 车路云协同管控平台 - 一键启动
-
-echo [1/4] 检查后端依赖...
-python -c "import fastapi, uvicorn" >nul 2>nul
-if errorlevel 1 (
-    echo     缺少后端依赖，正在安装（首次约 1-2 分钟）...
-    pip install -r "%BE%\requirements.txt" -i https://pypi.tuna.tsinghua.edu.cn/simple
-)
-python -c "import openai, matplotlib, docx, reportlab" >nul 2>nul
-if errorlevel 1 (
-    echo     缺少 ML/AI 依赖（openai/onnx/report库），正在安装...
-    pip install openai onnx onnxruntime matplotlib python-docx reportlab markdown -i https://pypi.tuna.tsinghua.edu.cn/simple
+if not exist "%BE%\requirements.txt" (
+    echo [ERROR] Run this start.bat from the project source_code directory.
+    pause
+    exit /b 1
 )
 
-echo [2/4] 检查前端依赖...
-if not exist "%FE%node_modules" (
-    echo     首次安装前端依赖（npm install）...
+if not exist "%SUMO_HOME%\bin\sumo.exe" (
+    if exist "C:\Program Files (x86)\Eclipse\Sumo\bin\sumo.exe" set "SUMO_HOME=C:\Program Files (x86)\Eclipse\Sumo"
+)
+if not exist "%SUMO_HOME%\bin\sumo.exe" (
+    if exist "C:\Program Files\Eclipse\Sumo\bin\sumo.exe" set "SUMO_HOME=C:\Program Files\Eclipse\Sumo"
+)
+if not exist "%SUMO_HOME%\bin\sumo.exe" (
+    where sumo.exe >nul 2>nul
+    if errorlevel 1 (
+        echo [ERROR] SUMO not found. Set SUMO_HOME to the SUMO installation directory.
+        pause
+        exit /b 1
+    )
+)
+echo SUMO_HOME=%SUMO_HOME%
+
+where python >nul 2>nul
+if errorlevel 1 (
+    echo [ERROR] Python not found in PATH.
+    pause
+    exit /b 1
+)
+
+if not exist "%BE%\.venv\Scripts\python.exe" (
+    echo [1/4] Creating the backend Python environment...
+    python -m venv --system-site-packages "%BE%\.venv"
+    if errorlevel 1 (
+        echo [ERROR] Could not create the Python environment.
+        pause
+        exit /b 1
+    )
+)
+set "PATH=%BE%\.venv\Scripts;%PATH%"
+echo [1/4] Checking backend dependencies...
+python -m pip install -r "%BE%\requirements.txt"
+if errorlevel 1 (
+    echo [ERROR] Backend dependency installation failed.
+    pause
+    exit /b 1
+)
+pushd "%BE%"
+python -c "import app.main"
+if errorlevel 1 (
+    popd
+    echo [ERROR] Backend import failed. See the error above.
+    pause
+    exit /b 1
+)
+popd
+
+where npm >nul 2>nul
+if errorlevel 1 (
+    echo [ERROR] Node.js/npm not found in PATH.
+    pause
+    exit /b 1
+)
+echo [2/4] Checking frontend dependencies...
+if not exist "%FE%\node_modules\vite\bin\vite.js" (
     pushd "%FE%"
     call npm install
+    if errorlevel 1 (
+        popd
+        echo [ERROR] Frontend dependency installation failed.
+        pause
+        exit /b 1
+    )
     popd
 )
 
-echo [3/4] 启动后端（新窗口，端口 8000）...
-pushd "%BE%"
-start "车路云后端" cmd /k "python -m uvicorn app.main:app --host 127.0.0.1 --port 8000"
-popd
-timeout /t 6 /nobreak >nul
+echo [3/4] Starting backend on port 8000...
+start "traffic-backend" /D "%BE%" cmd /k "python -m uvicorn app.main:app --host 127.0.0.1 --port 8000"
+powershell -NoProfile -Command "$ok=$false; for($i=0;$i -lt 30;$i++){try{$r=Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/v1/simulate/status' -TimeoutSec 2; if($r.code -eq 0){$ok=$true;break}}catch{}; Start-Sleep -Seconds 1}; if(-not $ok){exit 1}"
+if errorlevel 1 (
+    echo [ERROR] Backend did not become ready. Check the traffic-backend window.
+    pause
+    exit /b 1
+)
 
-echo [4/4] 启动前端（新窗口，端口 5173）...
-pushd "%FE%"
-start "车路云前端" cmd /k "npm run dev"
-popd
-timeout /t 5 /nobreak >nul
-
-echo.
-echo 正在打开浏览器: http://localhost:5173
-start http://localhost:5173
-echo.
-echo 完成！两个新窗口请保留（后端窗口显示 API 日志，前端窗口显示 Vite 地址）。
-echo 关闭时：直接关掉这两个窗口即可。
+echo [4/4] Starting frontend on port 5173...
+start "traffic-frontend" /D "%FE%" cmd /k "npm run dev"
+timeout /t 4 /nobreak >nul
+start "" "http://localhost:5173"
+echo Ready. Keep both service windows open during the demo.
 pause
-
