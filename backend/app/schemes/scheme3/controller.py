@@ -42,9 +42,9 @@ class Scheme3Controller(BaseScheme):
         super().__init__(ctx)
         self.network = RoadNetwork(ctx)
         self.weights = EdgeWeightManager(ctx)
-        self.fleet = FleetManager(ctx)
+        self.fleet = FleetManager(ctx, cooldown=int(ctx.config.get("cooldown", 30)))
         self.planner = RoutePlanner(ctx, self.network, self.weights)
-        self._auto_reroute = True
+        self._auto_reroute = bool(ctx.config.get("auto_reroute", True))
         self._step = 0
         self._auto_reroute_count = 0
         self._manual_reroute_count = 0

@@ -59,9 +59,10 @@ TOOL_SCHEMAS = [
                        "required": []}}},
     {"type": "function", "function": {
         "name": "switch_mode",
-        "description": "切换方案二控制器模式：mappo（AI 强化学习控制）或 scoot（规则自适应）",
+        "description": "切换方案二控制器模式：mappo（AI 强化学习控制）/ scoot（规则自适应）/ auto（按可用性自动选择）",
         "parameters": {"type": "object",
-                       "properties": {"mode": {"type": "string", "enum": ["mappo", "scoot"]}},
+                       "properties": {"mode": {"type": "string",
+                                               "enum": ["mappo", "scoot", "auto"]}},
                        "required": ["mode"]}}},
     {"type": "function", "function": {
         "name": "generate_report",
@@ -199,13 +200,21 @@ def execute_tool(runtime, name: str, args: dict) -> dict:
                     "vehicles": args.get("vehicles", 20)})
             return {"ok": True, "message": f"已注入 {args.get('event_type')}: {result}"}
         if name == "set_params":
+            # 统一走标准化适配器：按当前算法的 ParamSpec 校验，未声明参数直接报错，
+            # 避免"返回 ok 但一个参数都没改"（如 official 只认 mode/decision_step/cooldown）
             if runtime.scheme is None:
                 return {"ok": False, "message": "仿真未启动或无方案激活"}
-            return runtime.scheme.handle_action("set_params", args)
+            return _tool_configure_algorithm(
+                runtime, {"algorithm_id": runtime.scheme.name, "params": args})
         if name == "switch_mode":
             if runtime.scheme is None or runtime.scheme.name != "scheme_2":
-                return {"ok": False, "message": "方案二未激活，无法切换模式"}
-            action = "switch_to_mappo" if args.get("mode") == "mappo" else "switch_to_scoot"
+                cur = getattr(runtime.scheme, "name", "none")
+                return {"ok": False,
+                        "message": f"方案二未激活（当前算法：{cur}），无法切换模式"}
+            action = {"mappo": "switch_to_mappo", "scoot": "switch_to_scoot",
+                      "auto": "switch_to_auto"}.get(str(args.get("mode", "")).lower())
+            if action is None:
+                return {"ok": False, "message": "mode 需为 mappo / scoot / auto"}
             return runtime.scheme.handle_action(action, {})
         if name == "generate_report":
             m = runtime.realtime_metrics().get("overall", {})
@@ -303,7 +312,10 @@ def _tool_topology(runtime, eng) -> dict:
         degree[e["from"]] = degree.get(e["from"], 0) + 1
         degree[e["to"]] = degree.get(e["to"], 0) + 1
     key_inters = sorted(k for k, d in degree.items() if d >= 4)
-    arterial = [e["id"] for e in edges if e["speed"] >= 16.7]
+    # 主干道：路网自身的最高限速档。雄安窄路密网限速为 30~50 km/h，
+    # 固定 60 km/h 阈值会恒为空，故按实测最高限速取档。
+    top_speed = max((e["speed"] for e in edges), default=0.0)
+    arterial = [e["id"] for e in edges if e["speed"] >= top_speed - 0.01]
     graph: dict[str, list[str]] = {}
     if eng is not None:
         try:
@@ -322,7 +334,8 @@ def _tool_topology(runtime, eng) -> dict:
         "edge_count": len(edges),
         "key_intersections": key_inters[:40],      # 度 ≥ 4 的路口
         "tls_ids": tls_ids[:40],
-        "arterial_edges": arterial[:60],           # 限速 ≥ 60 km/h 主干道
+        "arterial_speed_limit": round(top_speed, 2),  # 主干道限速档（m/s）
+        "arterial_edges": arterial[:60],           # 主干道（最快限速档）
         "edge_graph": graph,                        # 边 → 后继边（可达关系）
         "edges": [{"id": e["id"], "from": e["from"], "to": e["to"],
                    "lanes": e["lanes"], "speed": e["speed"]} for e in edges][:200],
@@ -379,6 +392,7 @@ def _tool_configure_algorithm(runtime, args) -> dict:
         "algorithm_id": aid,
         "applied": res.get("applied", []),
         "params": res.get("params", {}),
+        "active": res.get("active", True),   # False=仅写入待生效配置，尚未生效
         "note": res.get("note"),
     }}
 

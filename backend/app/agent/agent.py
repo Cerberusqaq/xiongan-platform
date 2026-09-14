@@ -59,7 +59,7 @@ SYSTEM_PROMPT = f"""你是车路云协同管控智能体，运行在雄安车路
 用户：东侧拥堵，请调整最长绿灯
 助手：{{"tool": "compare_metrics", "args": {{"action": "set"}}}}
 用户：工具返回：{{"ok": true, "message": "已记录当前指标为基线", ...}}
-助手：{{"tool": "configure_algorithm", "args": {{"algorithm_id": "scheme_2", "params": {{"max_green": 40}}}}}}
+助手：{{"tool": "configure_algorithm", "args": {{"algorithm_id": "当前激活算法id", "params": {{"max_green": 40}}}}}}
 用户：工具返回：{{"ok": true, "data": {{"applied": ["max_green"], "params": {{"max_green": 40.0}}}}}}
 助手：{{"tool": "compare_metrics", "args": {{"action": "compare"}}}}
 用户：工具返回：{{"ok": true, "data": {{"comparison": {{"avg_speed": {{"before": 1.1, "after": 1.6, "delta": 0.5}}}}}}}}
@@ -67,6 +67,28 @@ SYSTEM_PROMPT = f"""你是车路云协同管控智能体，运行在雄安车路
 """
 
 MAX_STEPS = 8
+
+
+def _system_prompt(runtime=None) -> str:
+    """基础提示 + 当前激活算法提示。
+
+    不注入时模型会照 few-shot 例子对"未激活的方案"下指令（默认 official 演示下
+    configure_algorithm(scheme_2) 必然失败），故运行时动态告知当前算法 id。
+    """
+    hint = ""
+    try:
+        sch = getattr(runtime, "scheme", None)
+        if sch is not None:
+            hint = (f"\n当前激活算法 id = {sch.name}。"
+                    f"算法 id 对照：方案一=scheme_1、方案二=scheme_2、方案三=scheme_3、"
+                    f"官方方案=official、单路口 Webster=webster。"
+                    f"set_params 只作用于当前激活算法；若用户明确指定了某个算法，"
+                    f"configure_algorithm 的 algorithm_id 必须用用户指定的那个 id。"
+                    f"对未激活算法改参数会存为待生效配置（需以该方案启动仿真才生效），"
+                    f"请如实向用户说明这一点。")
+    except Exception:  # noqa: BLE001 提示增强失败不影响运行
+        hint = ""
+    return SYSTEM_PROMPT + hint
 
 
 def _parse_action(text: str):
@@ -96,6 +118,38 @@ def _parse_action(text: str):
     return None
 
 
+def _caveats(log: list) -> list[str]:
+    """从工具日志提取确定性提醒（不依赖模型自觉）：
+
+    - 未生效的"待生效配置"（对未激活算法改参数）；
+    - 最终未被成功调用覆盖的失败调用。
+    """
+    fails: dict[str, str] = {}
+    ok_tools: set[str] = set()
+    pending: list[str] = []
+    for c in log or []:
+        res = c.get("result") or {}
+        data = res.get("data") if isinstance(res.get("data"), dict) else {}
+        if res.get("ok"):
+            ok_tools.add(c.get("tool", ""))
+            if data.get("active") is False:
+                pending.append(
+                    f"{c.get('tool')}（算法 {data.get('algorithm_id')}）只写入待生效配置，"
+                    f"需以该算法启动仿真后才会生效")
+        else:
+            fails[c.get("tool", "")] = str(res.get("message") or "未知错误")
+    return ([f"{t} 调用失败：{m}" for t, m in fails.items() if t not in ok_tools]
+            + pending)
+
+
+def _with_caveats(text: str, log: list) -> str:
+    """把上述提醒前置到最终回复，避免"工具失败/未生效却回复成功"。"""
+    notes = _caveats(log)
+    if not notes:
+        return text
+    return "⚠️ " + "；".join(notes) + "\n\n" + (text or "")
+
+
 def run_agent(runtime, user_input: str, max_steps: int = MAX_STEPS):
     """执行一次 Agent 对话（携带跨轮会话记忆）。返回 (最终回复, 工具调用日志)。"""
     model_override = getattr(runtime, "_llm_model", None)
@@ -110,7 +164,7 @@ def run_agent(runtime, user_input: str, max_steps: int = MAX_STEPS):
         return client.chat.completions.create(**kwargs)
 
     conv = getattr(runtime, "_agent_conv", None)
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": _system_prompt(runtime)}]
     if conv:
         messages.extend(conv[-40:])
     base_len = len(messages)
@@ -124,7 +178,7 @@ def run_agent(runtime, user_input: str, max_steps: int = MAX_STEPS):
             text = (resp.choices[0].message.content or "").strip()
             action = _parse_action(text)
             if action is None:
-                return text or "（模型未返回内容）", log
+                return _with_caveats(text or "（模型未返回内容）", log), log
             # 连续重复同一动作视为无进展，强制终止并要求总结
             if action == last_action:
                 repeat_count += 1
@@ -148,17 +202,29 @@ def run_agent(runtime, user_input: str, max_steps: int = MAX_STEPS):
             result = execute_tool(runtime, name, args)
             log.append({"tool": name, "args": args, "result": result})
             messages.append({"role": "assistant", "content": text})
+            if result.get("ok"):
+                data = result.get("data") if isinstance(result.get("data"), dict) else {}
+                if data.get("active") is False or data.get("note"):
+                    # 只写入了待生效配置（算法未激活）：必须让用户知道"尚未生效"
+                    nxt = ("注意：本次调用只写入了**待生效配置**，在当前仿真中**尚未生效**——"
+                           "回复里必须明确告知用户：需以该算法启动仿真后才会生效，"
+                           "不要声称已经调整完成。")
+                else:
+                    nxt = "如果任务已完成，请直接输出最终中文回复；否则只输出下一步工具 JSON。"
+            else:
+                # 工具失败时必须如实说明，避免模型"宣称已执行成功"（实测出现过）
+                nxt = ("该工具调用**失败**：请如实向用户说明失败原因与当前实际状态，"
+                       "不要声称已完成该操作；如可换工具或换参数，请只输出下一步工具 JSON。")
             messages.append({
                 "role": "user",
-                "content": f"工具 {name} 返回: {json.dumps(result, ensure_ascii=False)[:1200]}。"
-                           f"如果任务已完成，请直接输出最终中文回复；否则只输出下一步工具 JSON。"})
+                "content": f"工具 {name} 返回: {json.dumps(result, ensure_ascii=False)[:1200]}。{nxt}"})
         # 达到步数上限：强制基于已有工具结果给出最终总结
         messages.append({"role": "user",
                          "content": "工具调用已达上限，请基于以上所有工具结果，用中文给出最终总结回复，"
                                     "不要再输出 JSON。"})
         resp = _create(messages)
         final_text = (resp.choices[0].message.content or "（模型未返回内容）").strip()
-        return final_text, log
+        return _with_caveats(final_text, log), log
     except Exception as exc:  # noqa: BLE001 LLM 不可用时不阻塞平台
         return f"[agent] LLM 调用失败: {type(exc).__name__}: {exc}", log
     finally:

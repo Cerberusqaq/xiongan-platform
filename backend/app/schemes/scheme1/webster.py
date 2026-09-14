@@ -33,14 +33,20 @@ class WebsterOptimizer:
     # ── 流量采集 ────────────────────────────────────────────
 
     def collect_flows(self) -> None:
-        self._flows = {}
+        """采集各路口分相位流量。
+
+        整表构造完成后原子替换：仿真线程的第一步 on_step 与本方法（init）可能并发调用，
+        边写边读会读到被重置的半成品字典（曾导致 scheme_1 启动 KeyError）。
+        """
+        flows: dict[str, dict[tuple, float]] = {}
         for tid, phases in self.phase_edges.items():
-            self._flows[tid] = {}
+            per_phase: dict[tuple, float] = {}
             for phase, edges in phases.items():
                 for e in edges:
-                    stats = self.engine.get_edge_stats(e)
-                    q = self._estimate_flow(stats)
-                    self._flows[tid][(phase, e)] = q
+                    per_phase[(phase, e)] = self._estimate_flow(
+                        self.engine.get_edge_stats(e))
+            flows[tid] = per_phase
+        self._flows = flows
 
     @staticmethod
     def _estimate_flow(stats: dict) -> float:

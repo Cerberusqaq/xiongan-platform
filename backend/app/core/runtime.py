@@ -1,5 +1,7 @@
 """应用运行时：串起会话/采集/推送/指标存储/算法方案/路网缓存。"""
 
+import threading
+
 from app.core.arrival import ContinuousArrival
 from app.core.datacollector import DataCollector
 from app.core.engine import Engine
@@ -60,6 +62,12 @@ class AppRuntime:
         self._agent_baseline: dict | None = None  # Agent 调控前后对比基线
         self._agent_conv: list[dict] = []      # Agent 会话记忆（跨轮）
         self._llm_model: str | None = None     # Agent 运行时模型覆盖（None=环境变量默认）
+        # 方案初始化/步进互斥：仿真线程先于 scheme.init() 启动，不加锁时
+        # scheme_1 的 init 与第一步 on_step 会并发写同一份流量表（KeyError）
+        self._scheme_lock = threading.RLock()
+        # 未激活算法的待生效参数：Agent/接口通过 configure_algorithm 预设，
+        # 下次以该方案启动仿真时自动套用（显式传入的同名参数优先）
+        self._pending_scheme_params: dict[str, dict] = {}
 
     # ── 仿真控制 ────────────────────────────────────────────
 
@@ -93,10 +101,16 @@ class AppRuntime:
             self.collector = DataCollector(self.session.engine)
             self.injector = EventInjector(SchemeContext(
                 engine=self.session.engine, push_event=self._push_event))
-            self.scheme = self._build_scheme(params.get("scheme", "none"),
-                                             params.get("scheme_params") or {})
-            if self.scheme is not None:
-                self.scheme.init()
+            scheme_name = params.get("scheme", "none")
+            scheme_params = dict(params.get("scheme_params") or {})
+            # 待生效参数（Agent 预设的未激活算法配置）补齐；显式传入优先
+            for k, v in (self._pending_scheme_params.get(scheme_name) or {}).items():
+                scheme_params.setdefault(k, v)
+            # 与仿真线程互斥：init 完成前不允许 on_step 处理步进
+            with self._scheme_lock:
+                self.scheme = self._build_scheme(scheme_name, scheme_params)
+                if self.scheme is not None:
+                    self.scheme.init()
             # 峰期持续到达器：密度生成场景(scenario 在 SCENARIOS 中)启用，
             # 一次性投放+预热后仍按峰期强度持续随机补车；渐入/无场景不启用。
             if scenario in SCENARIOS:
@@ -126,7 +140,8 @@ class AppRuntime:
         if self.session is None:
             raise SessionError(1001, "仿真未启动")
         if self.scheme is not None:
-            self.scheme.cleanup()
+            with self._scheme_lock:      # 与仿真线程的 on_step 串行
+                self.scheme.cleanup()
         self.session.stop()
         # 完全复位：会话/采集/事件/路网缓存全部清空，避免残留导致
         # 切换路网不生效、新打开页面默认回到上次路网
@@ -200,7 +215,8 @@ class AppRuntime:
 
     def _on_step(self, engine, step: int) -> None:
         if self.scheme is not None:
-            self.scheme.on_step()
+            with self._scheme_lock:      # 与 init/cleanup 串行，避免并发改方案内部状态
+                self.scheme.on_step()
         if self.safety_net is not None:
             self.safety_net.on_step(step)
         if self.arrival is not None:
@@ -267,6 +283,10 @@ class AppRuntime:
             raise SchemeError(3001, f"方案不存在: {scheme_id}")
         if self.scheme is not None and self.scheme.name == scheme_id:
             return self.scheme.handle_action(action, params)
+        if action == "set_params":
+            # 未激活方案：走标准适配器把参数存为"待生效配置"（与 Agent 工具一致）
+            from app.algorithms.adapter import get_adapter
+            return get_adapter(self, scheme_id).config(params)
         return {"ok": False, "message": "方案未激活，请先启动仿真并选中该方案"}
 
     def scheme_status(self, scheme_id: str) -> dict:

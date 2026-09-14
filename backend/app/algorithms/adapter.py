@@ -13,7 +13,16 @@ from app.algorithms.base import AlgorithmSpec, ParamSpec, OBS_GLOBAL, OBS_STRUCT
 
 
 def _validate_params(specs: list[ParamSpec], params: dict) -> tuple[dict, str | None]:
-    """按 ParamSpec 校验参数（类型/范围/枚举），返回 (合法参数, 错误信息)。"""
+    """按 ParamSpec 校验参数（类型/范围/枚举），返回 (合法参数, 错误信息)。
+
+    未在算法声明中的参数直接报错——避免"接口返回 ok 但什么都没改"。
+    """
+    params = params or {}
+    known = {p.key for p in specs}
+    unknown = sorted(k for k in params if k not in known)
+    if unknown:
+        return {}, (f"参数 {unknown} 不属于该算法；"
+                    f"可配置：{sorted(known) if known else '（无）'}")
     out: dict[str, Any] = {}
     for p in specs:
         if p.key not in params:
@@ -76,10 +85,16 @@ class AlgorithmAdapter:
                     "params": [], "observables": [], "metrics": [],
                     "capabilities": []}
         sp = self.spec.to_dict()
-        # 附带当前参数值
+        # 附带当前参数值（未激活时展示待生效配置）
         current = {}
         if self.scheme is not None:
             current = self._current_params()
+        else:
+            pending = (getattr(self.rt, "_pending_scheme_params", {}) or {}).get(
+                self.scheme_id)
+            if pending:
+                current = {p.key: pending.get(p.key, p.default)
+                           for p in self.spec.params}
         return {**base, **sp, "current": current}
 
     def _current_params(self) -> dict:
@@ -110,13 +125,29 @@ class AlgorithmAdapter:
         return out
 
     def config(self, params: dict) -> dict:
-        """MCP tools/call（参数部分）：校验 → 应用 → 返回新值。"""
-        if self.scheme is None:
-            return {"ok": False, "message": "方案未激活"}
+        """MCP tools/call（参数部分）：校验 → 应用 → 返回新值。
+
+        未激活的算法：参数写入运行时"待生效配置"，下次以该方案启动仿真时自动套用
+        （避免 Agent 对着未激活方案下指令时只会得到"方案未激活"而无法推进）。
+        """
         specs = self.spec.params if self.spec else []
         valid, err = _validate_params(specs, params or {})
         if err:
             return {"ok": False, "message": err}
+        if self.scheme is None:
+            if not valid:
+                return {"ok": False,
+                        "message": (f"算法 {self.scheme_id} 当前未激活且未提供参数；"
+                                    f"可配置：{[p.key for p in specs]}")}
+            store = getattr(self.rt, "_pending_scheme_params", None)
+            if isinstance(store, dict):
+                pending = dict(store.get(self.scheme_id) or {})
+                pending.update(valid)
+                store[self.scheme_id] = pending
+            return {"ok": True, "applied": list(valid), "active": False,
+                    "params": {p.key: valid.get(p.key, p.default) for p in specs},
+                    "note": (f"算法 {self.scheme_id} 当前未激活：参数已保存为待生效配置，"
+                             f"以该方案启动仿真时自动应用")}
         if not valid:
             return {"ok": True, "params": self._current_params(), "applied": []}
         # 优先走标准动作 set_params；未实现的方案仅存入 ctx.config（由算法 init 读取）
@@ -139,9 +170,11 @@ class AlgorithmAdapter:
                 if not (isinstance(res, dict) and res.get("ok")) else None}
 
     def action(self, action: str, params: dict) -> dict:
-        """MCP tools/call：通用动作透传。"""
+        """MCP tools/call：通用动作透传（动作需要运行中的方案实例）。"""
         if self.scheme is None:
-            return {"ok": False, "message": "方案未激活"}
+            return {"ok": False,
+                    "message": (f"算法 {self.scheme_id} 当前未激活，动作 {action} 无法执行；"
+                                f"请先以该方案启动仿真（参数可用 configure_algorithm 预设）")}
         try:
             return self.scheme.handle_action(action, params or {})
         except Exception as exc:  # noqa: BLE001

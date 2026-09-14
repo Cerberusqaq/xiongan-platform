@@ -85,6 +85,11 @@ class Scheme2Controller(BaseScheme):
             torch_ok=self.torch_ok,
             global_dim=self.encoder.dim() * max(1, len(self.encoder.tls_ids)))
         self.scoot = SCOOTController(ctx)
+        # 绿灯约束可在启动参数 / 待生效配置中覆盖（ParamSpec 声明的可配置项）
+        if ctx.config.get("min_green") is not None:
+            self.mappo.min_green = float(ctx.config["min_green"])
+        if ctx.config.get("max_green") is not None:
+            self.mappo.max_green = float(ctx.config["max_green"])
         # 奖励所需的绿灯上限（空放持有惩罚用）
         self.reward.w["max_green"] = self.mappo.max_green
         self.mode = self._resolve_mode(ctx.config.get("mode"))

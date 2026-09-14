@@ -75,7 +75,9 @@ class Scheme1Controller(BaseScheme):
         period_range = self.tod.get_cycle_range(period)
         self.webster.collect_flows()
         timing = self.webster.compute_all(period_range)
-        if self.tod.green_wave_enabled(period):
+        # 绿波开关：TOD 时段默认 × 运行时可配置参数（green_wave）
+        if (self.tod.green_wave_enabled(period)
+                and bool(self.ctx.config.get("green_wave", True))):
             cycle = self.maxband.unified_cycle([p["cycle"] for p in timing.values()])
             self.maxband.apply_offsets(timing, cycle)
         self.webster.apply(timing)
