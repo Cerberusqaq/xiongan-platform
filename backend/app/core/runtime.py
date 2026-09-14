@@ -68,6 +68,8 @@ class AppRuntime:
         # 未激活算法的待生效参数：Agent/接口通过 configure_algorithm 预设，
         # 下次以该方案启动仿真时自动套用（显式传入的同名参数优先）
         self._pending_scheme_params: dict[str, dict] = {}
+        # 最近一次启动参数（原样保留，供"运行中切换方案"重放同一路网/车流/场景）
+        self._last_start_params: dict = {}
 
     # ── 仿真控制 ────────────────────────────────────────────
 
@@ -78,6 +80,8 @@ class AppRuntime:
             self._ensure_network(params.get("net_path"))
         except Exception as exc:  # 路网解析失败要如实报错，不能静默吞掉
             raise SessionError(1005, f"路网解析失败: {exc}") from exc
+        # 原样留存启动参数：切换方案时按同一路网/车流/场景重放
+        self._last_start_params = dict(params)
         # 交通场景：指定场景时按其密度生成一次性投放车流文件，替换默认 route 文件，
         # 并开启启动预热（无头高倍速投放+散开，期间前端不渲染，投放完再渲染）。
         # （复用路网自带路由；场景为启动参数，与"右转常绿/方案"正交）
@@ -186,6 +190,29 @@ class AppRuntime:
             return {"ok": False, "applied": False, "reason": "no_sim"}
         self.session.engine.set_right_turn_green(bool(enabled))
         return {"ok": True, "applied": True, "enabled": bool(enabled)}
+
+    def switch_scheme(self, scheme_id: str) -> dict:
+        """运行中切换控制方案：按同一路网/车流/场景参数重启仿真并挂载新方案。
+
+        说明：SUMO 程序与控制器状态无法热替换，因此必须重启——步数、在网车辆与
+        历史指标会重置；未激活方案的"待生效配置"会在启动时自动应用。
+        """
+        if not registry.has_scheme(scheme_id):
+            raise SchemeError(3001, f"方案不存在: {scheme_id}")
+        if self.session is None:
+            raise SessionError(1001, "仿真未启动")
+        if self.scheme is not None and self.scheme.name == scheme_id:
+            return {"ok": True, "switched": False, "scheme": scheme_id,
+                    "reason": "该方案已在运行"}
+        params = dict(self._last_start_params or {})
+        if not params.get("net_path"):
+            raise SessionError(1004, "缺少启动参数，无法切换方案")
+        params["scheme"] = scheme_id
+        self.stop()
+        res = self.start(params)
+        return {"ok": True, "switched": True, "scheme": scheme_id,
+                "session_id": res.get("session_id"),
+                "note": "已重启仿真并切换到该方案（步数与在网车辆已重置）"}
 
     def status(self) -> dict:
         if self.session is None:

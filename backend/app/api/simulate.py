@@ -42,6 +42,12 @@ async def set_right_turn_green(request: Request, body: dict = Body(...)):
         bool(body.get("enabled", False))))
 
 
+@router.post("/switch-scheme")
+async def switch_scheme(request: Request, body: dict = Body(...)):
+    """运行中切换控制方案：按同一路网/车流重启仿真并挂载新方案（步数会重置）。"""
+    return ok(request.app.state.runtime.switch_scheme(str(body.get("scheme", ""))))
+
+
 @router.get("/scenarios")
 async def scenarios(request: Request):
     """可选交通场景清单（前端右上角下拉）。"""

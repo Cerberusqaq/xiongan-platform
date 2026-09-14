@@ -21,8 +21,14 @@ def _validate_params(specs: list[ParamSpec], params: dict) -> tuple[dict, str | 
     known = {p.key for p in specs}
     unknown = sorted(k for k in params if k not in known)
     if unknown:
-        return {}, (f"参数 {unknown} 不属于该算法；"
-                    f"可配置：{sorted(known) if known else '（无）'}")
+        msg = (f"参数 {unknown} 不属于该算法；"
+               f"可配置：{sorted(known) if known else '（无）'}")
+        # 常见误用：最长绿灯/变灯倒计时是方案二专属参数，给出可行动的下一步
+        if set(unknown) & {"max_green", "min_green", "switch_clearance"}:
+            msg += ("。最长绿灯 min_green/max_green 与 switch_clearance 属于方案二"
+                    "（scheme_2）：可先用 switch_scheme 切到 scheme_2（会重启仿真）再设置，"
+                    "或用 configure_algorithm(algorithm_id=\"scheme_2\", …) 存为待生效配置")
+        return {}, msg
     out: dict[str, Any] = {}
     for p in specs:
         if p.key not in params:

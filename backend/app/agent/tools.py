@@ -15,10 +15,11 @@ TOOL_SCHEMAS = [
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {
         "name": "get_tls_status",
-        "description": "获取某信号路口的当前相位与排队情况",
+        "description": "获取信号路口状态：当前相位、相位时长，以及各进口边的排队车辆数（判断哪个方向长期未放行/饿死）。tls_id 传路口编号（如 \"1\"），传 all 或不传可一次返回全部路口概要；注意这里要的是路口 id，不是道路 id（传道路 id 会自动解析到其受控路口）",
         "parameters": {"type": "object",
-                       "properties": {"tls_id": {"type": "string", "description": "信号灯 id"}},
-                       "required": ["tls_id"]}}},
+                       "properties": {"tls_id": {"type": "string",
+                                                 "description": "路口 id（如 \"1\"；all=全部路口）"}},
+                       "required": []}}},
     {"type": "function", "function": {
         "name": "get_edge_status",
         "description": "获取某条道路的实时状态（车辆数、平均速度、占有率、限速），用于评估通行/给出建议车速（速度单位 m/s，汇报请换算为 km/h）",
@@ -46,7 +47,8 @@ TOOL_SCHEMAS = [
                                           "enum": ["construction", "large_event", "accident"]},
                            "edge_ids": {"type": "array", "items": {"type": "string"},
                                         "description": "受影响边"},
-                           "vehicles": {"type": "integer", "description": "突发车流的车辆数（large_event 用）"}},
+                           "vehicles": {"type": ["integer", "array"],
+                                        "description": "突发车流的车辆数（large_event 用；传数组时按元素个数计）"}},
                        "required": ["event_type"]}}},
     {"type": "function", "function": {
         "name": "set_params",
@@ -65,6 +67,25 @@ TOOL_SCHEMAS = [
                                                "enum": ["mappo", "scoot", "auto"]}},
                        "required": ["mode"]}}},
     {"type": "function", "function": {
+        "name": "get_custom_metrics",
+        "description": "获取自定义指标：完成率、累计出发/到达、最久行程车辆、最久等待车辆、最堵道路（most_congested_edge）、最堵路口（most_congested_tls），用于找出最堵的路段与路口",
+        "parameters": {"type": "object", "properties": {}, "required": []}}},
+    {"type": "function", "function": {
+        "name": "get_algorithm_state",
+        "description": "读取某算法（默认当前激活算法）的当前参数、框架统一观测快照与算法内部指标（如方案二 MAPPO/SCOOT 决策计数、观测维度、奖励权重）",
+        "parameters": {"type": "object",
+                       "properties": {"algorithm_id": {"type": "string",
+                                                       "description": "算法 id（可选，默认当前激活算法）"}},
+                       "required": []}}},
+    {"type": "function", "function": {
+        "name": "switch_scheme",
+        "description": "切换当前控制方案（scheme_1 方案一 / scheme_2 方案二 / scheme_3 方案三 / official 官方方案 / webster）。注意：切换会以同一路网与车流重启仿真，步数与在网车辆会重置——回复里必须说明这一点",
+        "parameters": {"type": "object",
+                       "properties": {"algorithm_id": {"type": "string",
+                                                       "enum": ["scheme_1", "scheme_2", "scheme_3",
+                                                                "official", "webster"]}},
+                       "required": ["algorithm_id"]}}},
+    {"type": "function", "function": {
         "name": "set_right_turn_green",
         "description": "开启/关闭右转常绿（路口信号程序级开关，仿真运行中即时生效、关闭时自动还原原程序）。注意：这不是算法参数，不能用 configure_algorithm 设置",
         "parameters": {"type": "object",
@@ -73,7 +94,7 @@ TOOL_SCHEMAS = [
                        "required": ["enabled"]}}},
     {"type": "function", "function": {
         "name": "generate_report",
-        "description": "汇总当前全局指标生成简要态势报告（Markdown）",
+        "description": "生成一份当前路网态势报告（Markdown）：在网车辆、平均速度、平均等待/排队、累计到达、活跃事件。用户说\"生成报告/态势报告/出一份报告\"时必须调用本工具（get_network_status 只是原始指标，不能代替报告）",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {
         "name": "get_network_topology",
@@ -81,10 +102,12 @@ TOOL_SCHEMAS = [
         "parameters": {"type": "object", "properties": {}, "required": []}}},
     {"type": "function", "function": {
         "name": "get_region_status",
-        "description": "获取一片区域的聚合实时指标（车辆数/平均速度/排队/拥堵度）；edges 传边 id 列表，不传则覆盖全路网（速度单位 m/s，汇报请换算为 km/h）",
+        "description": "获取一片区域的聚合实时指标（车辆数/平均速度/排队/拥堵度）。两种用法：region 传方位（东/南/西/北/中心，后端按路网坐标自动解析为道路集合，适合「东侧拥堵」这类说法）；或 edges 传边 id 列表。都不传则覆盖全路网（速度单位 m/s，汇报请换算为 km/h）",
         "parameters": {"type": "object",
                        "properties": {"edges": {"type": "array", "items": {"type": "string"},
-                                                "description": "区域包含的边 id 列表（可选，默认全路网）"}},
+                                                "description": "区域包含的边 id 列表（可选）"},
+                                      "region": {"type": "string",
+                                                 "description": "方位区域：东/南/西/北/中心（可选，与 edges 二选一）"}},
                        "required": []}}},
     {"type": "function", "function": {
         "name": "configure_algorithm",
@@ -115,12 +138,39 @@ TOOL_SCHEMAS = [
 
 
 def _safe_params(schema, args):
-    """参数范围校验（minimum/maximum/enum 白名单）。"""
+    """参数校验：类型 + 枚举白名单 + 数值范围。
+
+    类型必须真正校验：模型常把数组/列表塞进字符串参数（如 tls_id=["1","2"]），
+    不拦就会拿着非法类型去查 TraCI 并抛出难懂的错误。
+    """
     params = schema.get("function", {}).get("parameters", {})
     props = params.get("properties", {})
     out = {}
     for k, v in (args or {}).items():
         spec = props.get(k, {})
+        ptype = spec.get("type")
+        if ptype == "string" and not isinstance(v, str):
+            return None, (f"参数 {k} 需为字符串（收到 {type(v).__name__}）；"
+                          f"多个值请分开多次调用")
+        if ptype == "array" and isinstance(v, str):
+            # 宽容：模型常把列表参数写成 "E1,E2" 这种逗号串
+            v = [s.strip() for s in v.split(",") if s.strip()]
+        if ptype == "array" and not isinstance(v, list):
+            return None, f"参数 {k} 需为数组（收到 {type(v).__name__}）"
+        if ptype == "object" and not isinstance(v, dict):
+            return None, f"参数 {k} 需为对象（收到 {type(v).__name__}）"
+        if ptype == "boolean" and not isinstance(v, bool):
+            if isinstance(v, str) and v.strip().lower() in ("true", "false", "1", "0"):
+                v = v.strip().lower() in ("true", "1")
+            else:
+                return None, f"参数 {k} 需为 true/false（收到 {v!r}）"
+        if ptype in ("number", "integer"):
+            try:
+                v = float(v)
+                if ptype == "integer":
+                    v = int(v)
+            except (TypeError, ValueError):
+                return None, f"参数 {k} 需为数字（收到 {type(v).__name__}）"
         if spec.get("enum"):
             if isinstance(v, str):
                 # 容错：忽略大小写与首尾空格（LLM 常把 SCOOT/MAPPO 写成大写）
@@ -176,21 +226,23 @@ def _execute_tool(runtime, name: str, args: dict) -> dict:
                 "avg_waiting_time": m.get("avg_waiting_time"),
                 "avg_queue_length": m.get("avg_queue_length")}}
         if name == "get_tls_status":
-            tid = args.get("tls_id", "")
-            st = eng.get_tls_state(tid)
-            edges = eng.get_edge_ids()
-            queue = 0
-            for e in edges:
-                try:
-                    q = eng.get_edge_queue(e)
-                    if q > 0:
-                        queue += q
-                except Exception:  # noqa: BLE001
-                    pass
-            return {"ok": True, "data": {
-                "tls_id": tid, "phase_index": st["phase_index"],
-                "num_phases": st["num_phases"],
-                "phase_duration": st["phase_duration"]}}
+            tid = str(args.get("tls_id") or "").strip()
+            tls_ids = [str(t) for t in (eng.get_tls_ids() or [])]
+            # 不传 / all：一次返回全部路口概要（模型常不知道路口 id，避免空转）
+            if not tid or tid.lower() in ("all", "*", "all_tls", "全部", "所有"):
+                return {"ok": True, "data": {
+                    "count": len(tls_ids),
+                    "intersections": [_tls_brief(eng, t) for t in tls_ids[:40]]}}
+            if tid not in tls_ids:
+                # 容错：模型常把"边 id"当成"路口 id"传进来，自动解析到受控路口
+                guess = _resolve_tls_by_edge(eng, tid, tls_ids)
+                if guess:
+                    tid = guess
+                else:
+                    return {"ok": False,
+                            "message": (f"信号灯不存在: {tid}。路口 id 形如 {tls_ids[:6]}…"
+                                        f"（可用 all 一次查看全部）；查某条道路请用 get_edge_status")}
+            return {"ok": True, "data": _tls_detail(eng, tid)}
         if name == "get_edge_status":
             eid = args.get("edge_id", "")
             stats = eng.get_edge_stats(eid)
@@ -214,10 +266,13 @@ def _execute_tool(runtime, name: str, args: dict) -> dict:
         if name == "list_events":
             return {"ok": True, "data": runtime.list_events()}
         if name == "inject_event":
+            veh = args.get("vehicles", 20)
+            if isinstance(veh, (list, tuple)):   # 模型有时传车辆 id 列表 → 按个数计
+                veh = len(veh)
             result = runtime.inject_event(
                 args.get("event_type"), {
                     "edge_ids": args.get("edge_ids", []),
-                    "vehicles": args.get("vehicles", 20)})
+                    "vehicles": veh})
             return {"ok": True, "message": f"已注入 {args.get('event_type')}: {result}"}
         if name == "set_params":
             # 统一走标准化适配器：按当前算法的 ParamSpec 校验，未声明参数直接报错，
@@ -237,9 +292,6 @@ def _execute_tool(runtime, name: str, args: dict) -> dict:
                 return {"ok": False, "message": "mode 需为 mappo / scoot / auto"}
             return runtime.scheme.handle_action(action, {})
         if name == "set_right_turn_green":
-            # 右转常绿是"信号程序级开关"（REST: /simulate/right-turn-green），
-            # 不属于任何算法的 ParamSpec，故单独成工具（原来 Agent 无工具可用，
-            # 只能瞎猜 configure_algorithm 的参数名而失败）
             if runtime.session is None:
                 return {"ok": False, "message": "仿真未启动，无法设置右转常绿"}
             raw = args.get("enabled", True)
@@ -252,6 +304,21 @@ def _execute_tool(runtime, name: str, args: dict) -> dict:
                 return {"ok": False, "message": "仿真未启动，无法设置右转常绿"}
             return {"ok": True, "data": {"right_turn_green": enabled},
                     "message": "已开启右转常绿" if enabled else "已关闭右转常绿并还原原程序"}
+        if name == "get_custom_metrics":
+            # 平台"自定义指标"：完成率/累计出发到达/最久车辆/最堵道路/最堵路口
+            # （原先只有 REST /metrics/spotlight 暴露，Agent 无法查询）
+            return {"ok": True, "data": runtime.spotlight()}
+        if name == "get_algorithm_state":
+            return _tool_algorithm_state(runtime, args)
+        if name == "switch_scheme":
+            aid = str(args.get("algorithm_id") or args.get("scheme_id") or "")
+            if not aid:
+                return {"ok": False,
+                        "message": "需要 algorithm_id（scheme_1/scheme_2/scheme_3/official/webster）"}
+            try:
+                return runtime.switch_scheme(aid)
+            except Exception as exc:  # noqa: BLE001 未知方案/未启动等给出可读原因
+                return {"ok": False, "message": f"切换方案失败: {exc}"}
         if name == "generate_report":
             m = runtime.realtime_metrics().get("overall", {})
             st = runtime.status()
@@ -270,7 +337,21 @@ def _execute_tool(runtime, name: str, args: dict) -> dict:
         if name == "get_network_topology":
             return _tool_topology(runtime, eng)
         if name == "get_region_status":
-            return _tool_region_status(eng, args.get("edges") or [])
+            edges = list(args.get("edges") or [])
+            region = str(args.get("region") or "").strip()
+            if not edges and region:
+                # 方位词（东/南/西/北/中心）→ 具体边集合，避免模型瞎猜边 id
+                edges, err = _resolve_region_edges(runtime, region)
+                if err:
+                    return {"ok": False, "message": err}
+                if not edges:
+                    return {"ok": False,
+                            "message": f"区域「{region}」未匹配到任何道路，请改用边 id 列表"}
+            res = _tool_region_status(eng, edges)
+            if region and isinstance(res.get("data"), dict):
+                res["data"]["region"] = region
+                res["data"]["region_edges_sample"] = edges[:10]
+            return res
         if name == "configure_algorithm":
             return _tool_configure_algorithm(runtime, args)
         if name == "algorithm_action":
@@ -280,6 +361,108 @@ def _execute_tool(runtime, name: str, args: dict) -> dict:
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "message": f"工具执行失败: {type(exc).__name__}: {exc}"}
     return {"ok": False, "message": f"未处理工具: {name}"}
+
+
+def _tls_detail(eng, tid: str) -> dict:
+    """单个路口：相位信息 + 各进口边排队（识别未放行/饿死方向的依据）。"""
+    st = eng.get_tls_state(tid)
+    approach_q: dict[str, int] = {}
+    try:
+        for lk in eng.get_tls_links(tid):
+            e = str(lk.get("from_edge") or "")
+            if e and e not in approach_q:
+                approach_q[e] = int(eng.get_edge_queue(e))
+    except Exception:  # noqa: BLE001
+        approach_q = {}
+    ranked = sorted(approach_q.items(), key=lambda kv: -kv[1])[:3]
+    return {"tls_id": tid, "phase_index": st["phase_index"],
+            "num_phases": st["num_phases"],
+            "phase_duration": st["phase_duration"],
+            "state_str": st.get("state_str", ""),
+            "approach_queues": approach_q,
+            "worst_approaches": [{"edge": e, "queue": q} for e, q in ranked]}
+
+
+def _tls_brief(eng, tid: str) -> dict:
+    """路口概要（不含全量进口排队，供"一次查全部路口"）。"""
+    d = _tls_detail(eng, tid)
+    total = sum(d["approach_queues"].values())
+    return {"tls_id": tid, "phase_index": d["phase_index"],
+            "num_phases": d["num_phases"], "queue_total": total,
+            "worst_approaches": d["worst_approaches"]}
+
+
+def _resolve_tls_by_edge(eng, edge_like: str, tls_ids: list[str]) -> str | None:
+    """把边 id（或形如 E12_8 的串）解析到受其控制的信号灯。"""
+    if not edge_like:
+        return None
+    try:
+        for tid in tls_ids:
+            for lk in eng.get_tls_links(tid):
+                if str(lk.get("from_edge") or "") == edge_like:
+                    return tid
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
+_REGION_ALIASES = {
+    "东": "east", "东侧": "east", "东边": "east", "东部": "east",
+    "西": "west", "西侧": "west", "西边": "west", "西部": "west",
+    "南": "south", "南侧": "south", "南边": "south", "南部": "south",
+    "北": "north", "北侧": "north", "北边": "north", "北部": "north",
+    "中心": "center", "中部": "center", "中央": "center", "中间": "center",
+    "east": "east", "west": "west", "south": "south", "north": "north",
+    "center": "center", "centre": "center",
+}
+
+
+def _resolve_region_edges(runtime, region: str) -> tuple[list[str], str]:
+    """方位区域 → 边集合（按路网节点坐标自动划分东/南/西/北/中心）。
+
+    返回 (边 id 列表, 错误信息)。模型说"东侧拥堵"时无法直接给边 id，
+    这里把方位词落到具体道路上，避免它瞎猜 id。
+    """
+    gj = getattr(runtime, "_geojson", None) or {}
+    nodes: dict[str, tuple[float, float]] = {}
+    edges: list[dict] = []
+    for f in gj.get("features", []) or []:
+        geom = (f.get("geometry") or {}).get("type")
+        p = f.get("properties") or {}
+        if geom == "Point":
+            coord = (f.get("geometry") or {}).get("coordinates") or []
+            if len(coord) >= 2:
+                nodes[str(p.get("node_id"))] = (float(coord[0]), float(coord[1]))
+        elif geom == "LineString":
+            edges.append({"id": p.get("edge_id"), "from": p.get("from_node")})
+    if not nodes or not edges:
+        return [], "路网数据缺失，无法按方位解析区域"
+    key = _REGION_ALIASES.get(str(region).strip().lower()) or \
+        _REGION_ALIASES.get(str(region).strip())
+    if key is None:
+        return [], (f"无法识别方位「{region}」，可用：东/南/西/北/中心")
+    xs = [c[0] for c in nodes.values()]
+    ys = [c[1] for c in nodes.values()]
+    cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    sx = max(1e-6, (max(xs) - min(xs)) / 4)
+    sy = max(1e-6, (max(ys) - min(ys)) / 4)
+    out: list[str] = []
+    for e in edges:
+        pos = nodes.get(str(e.get("from")))
+        if pos is None or not e.get("id"):
+            continue
+        x, y = pos
+        if key == "east" and x >= cx + sx:
+            out.append(e["id"])
+        elif key == "west" and x <= cx - sx:
+            out.append(e["id"])
+        elif key == "north" and y >= cy + sy:
+            out.append(e["id"])
+        elif key == "south" and y <= cy - sy:
+            out.append(e["id"])
+        elif key == "center" and abs(x - cx) <= sx and abs(y - cy) <= sy:
+            out.append(e["id"])
+    return out, ""
 
 
 def _dijkstra(eng, frm: str, to: str):
@@ -463,6 +646,23 @@ def _current_metrics(runtime) -> dict:
     except Exception:  # noqa: BLE001
         pass
     return out
+
+
+def _tool_algorithm_state(runtime, args) -> dict:
+    """算法当前参数 + 框架统一观测 + 算法内部指标（MCP resources/read）。"""
+    from app.algorithms.adapter import get_adapter
+    aid = str(args.get("algorithm_id") or
+              (getattr(runtime.scheme, "name", "") if runtime.scheme else ""))
+    if not aid:
+        return {"ok": False, "message": "未指定算法，且当前无激活方案"}
+    try:
+        adapter = get_adapter(runtime, aid)
+    except KeyError:
+        return {"ok": False, "message": f"算法不存在: {aid}"}
+    try:
+        return {"ok": True, "data": adapter.state()}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "message": f"读取算法状态失败: {exc}"}
 
 
 def _tool_compare_metrics(runtime, action: str) -> dict:

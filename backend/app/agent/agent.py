@@ -38,7 +38,10 @@ SYSTEM_PROMPT = f"""你是车路云协同管控智能体，运行在雄安车路
 3. 参数要在合理范围内（工具会校验）。
 4. 突发车流/事故时先分析受影响区域，再执行调控。
 5. 用户要求"调整/执行/切换/调控"等操作时，**必须调用对应工具实际执行**
-   （configure_algorithm / algorithm_action / inject_event 等），执行完再总结结果；不要只给建议不执行。
+   （configure_algorithm / algorithm_action / inject_event / switch_scheme /
+   set_right_turn_green 等），执行完再总结结果；不要只给建议不执行。
+   **只看不写是错误行为**：先用不超过 2 个只读工具快速看清态势，随后立即执行写操作，
+   不要用一串只读查询耗尽步数。
 6. **速度一律以 km/h 汇报**：工具返回的速度类指标（avg_speed 等）单位为 m/s，向用户汇报时必须
    换算成 km/h（数值 ×3.6）并标注单位 km/h，与平台主界面单位保持一致。
 
@@ -66,7 +69,7 @@ SYSTEM_PROMPT = f"""你是车路云协同管控智能体，运行在雄安车路
 助手：已将最长绿灯调至 40 秒，平均速度由 4.0 提升到 5.8 km/h，拥堵缓解。
 """
 
-MAX_STEPS = 8
+MAX_STEPS = 10
 
 
 def _system_prompt(runtime=None) -> str:
@@ -85,7 +88,17 @@ def _system_prompt(runtime=None) -> str:
                     f"set_params 只作用于当前激活算法；若用户明确指定了某个算法，"
                     f"configure_algorithm 的 algorithm_id 必须用用户指定的那个 id。"
                     f"对未激活算法改参数会存为待生效配置（需以该方案启动仿真才生效），"
-                    f"请如实向用户说明这一点。")
+                    f"请如实向用户说明这一点。"
+                    f"\n能力对照：最堵道路/路口、完成率→get_custom_metrics；"
+                    f"方位区域（东/南/西/北/中心）→get_region_status(region=…)；"
+                    f"路口各进口排队→get_tls_status（tls_id 是路口编号，传 all 看全部）；"
+                    f"算法参数与内部指标→get_algorithm_state；"
+                    f"用户要求生成报告/态势报告→generate_report（不要用 get_network_status 代替）；"
+                    f"切换控制方案→switch_scheme（会重启仿真、步数清零，必须告知用户）；"
+                    f"右转常绿→set_right_turn_green（不是算法参数）。"
+                    f"注意：最长绿灯 min_green/max_green、绿灯倒计时 switch_clearance 属于"
+                    f"方案二（scheme_2）专属参数，其它方案没有这些参数——用户要求调整而当前"
+                    f"不是方案二时，先用 switch_scheme 切到 scheme_2（并说明会重启仿真）再设置。")
     except Exception:  # noqa: BLE001 提示增强失败不影响运行
         hint = ""
     return SYSTEM_PROMPT + hint
@@ -118,11 +131,18 @@ def _parse_action(text: str):
     return None
 
 
-def _caveats(log: list) -> list[str]:
+WRITE_TOOLS = {"inject_event", "configure_algorithm", "algorithm_action", "set_params",
+               "switch_mode", "set_right_turn_green", "switch_scheme"}
+_WRITE_INTENT = ("执行", "调控", "处置", "开启", "打开", "关闭", "调整", "调至", "调到",
+                 "切换", "切到", "注入", "设置", "优化", "限行", "重路由", "加车", "开启")
+
+
+def _caveats(log: list, user_input: str = "") -> list[str]:
     """从工具日志提取确定性提醒（不依赖模型自觉）：
 
     - 未生效的"待生效配置"（对未激活算法改参数）；
-    - 最终未被成功调用覆盖的失败调用。
+    - 最终未被成功调用覆盖的失败调用；
+    - 用户明确要求"执行类"操作，但整轮没有任何写操作落地（只查不写）。
     """
     fails: dict[str, str] = {}
     ok_tools: set[str] = set()
@@ -138,13 +158,18 @@ def _caveats(log: list) -> list[str]:
                     f"需以该算法启动仿真后才会生效")
         else:
             fails[c.get("tool", "")] = str(res.get("message") or "未知错误")
-    return ([f"{t} 调用失败：{m}" for t, m in fails.items() if t not in ok_tools]
-            + pending)
+    notes = ([f"{t} 调用失败：{m}" for t, m in fails.items() if t not in ok_tools]
+             + pending)
+    if user_input and any(k in user_input for k in _WRITE_INTENT) \
+            and not (ok_tools & WRITE_TOOLS):
+        notes.append("本轮只做了查询，未成功执行任何调控动作（注入事件/调参/切方案/"
+                     "右转常绿等写操作均未落地），如需执行请再确认一次")
+    return notes
 
 
-def _with_caveats(text: str, log: list) -> str:
-    """把上述提醒前置到最终回复，避免"工具失败/未生效却回复成功"。"""
-    notes = _caveats(log)
+def _with_caveats(text: str, log: list, user_input: str = "") -> str:
+    """把上述提醒前置到最终回复，避免"工具失败/未生效/只查不写却回复成功"。"""
+    notes = _caveats(log, user_input)
     if not notes:
         return text
     return "⚠️ " + "；".join(notes) + "\n\n" + (text or "")
@@ -178,7 +203,7 @@ def run_agent(runtime, user_input: str, max_steps: int = MAX_STEPS):
             text = (resp.choices[0].message.content or "").strip()
             action = _parse_action(text)
             if action is None:
-                return _with_caveats(text or "（模型未返回内容）", log), log
+                return _with_caveats(text or "（模型未返回内容）", log, user_input), log
             # 连续重复同一动作视为无进展，强制终止并要求总结
             if action == last_action:
                 repeat_count += 1
@@ -224,7 +249,7 @@ def run_agent(runtime, user_input: str, max_steps: int = MAX_STEPS):
                                     "不要再输出 JSON。"})
         resp = _create(messages)
         final_text = (resp.choices[0].message.content or "（模型未返回内容）").strip()
-        return _with_caveats(final_text, log), log
+        return _with_caveats(final_text, log, user_input), log
     except Exception as exc:  # noqa: BLE001 LLM 不可用时不阻塞平台
         return f"[agent] LLM 调用失败: {type(exc).__name__}: {exc}", log
     finally:
