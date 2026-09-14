@@ -97,17 +97,19 @@ class AppRuntime:
         self.session = Session(engine_factory=self._engine_factory,
                                step_handler=self._on_step)
         try:
-            sid = self.session.start(params)
-            self.collector = DataCollector(self.session.engine)
-            self.injector = EventInjector(SchemeContext(
-                engine=self.session.engine, push_event=self._push_event))
-            scheme_name = params.get("scheme", "none")
-            scheme_params = dict(params.get("scheme_params") or {})
-            # 待生效参数（Agent 预设的未激活算法配置）补齐；显式传入优先
-            for k, v in (self._pending_scheme_params.get(scheme_name) or {}).items():
-                scheme_params.setdefault(k, v)
-            # 与仿真线程互斥：init 完成前不允许 on_step 处理步进
+            # 持锁跨越"启动仿真线程 → 赋值 collector/injector/scheme → scheme.init()"：
+            # 否则仿真线程的第一步 on_step 可能读到尚未赋值的 collector（AttributeError
+            # 会被会话线程吞掉并把状态置为 error，表现为"启动后立刻错误/无数据"）
             with self._scheme_lock:
+                sid = self.session.start(params)
+                self.collector = DataCollector(self.session.engine)
+                self.injector = EventInjector(SchemeContext(
+                    engine=self.session.engine, push_event=self._push_event))
+                scheme_name = params.get("scheme", "none")
+                scheme_params = dict(params.get("scheme_params") or {})
+                # 待生效参数（Agent 预设的未激活算法配置）补齐；显式传入优先
+                for k, v in (self._pending_scheme_params.get(scheme_name) or {}).items():
+                    scheme_params.setdefault(k, v)
                 self.scheme = self._build_scheme(scheme_name, scheme_params)
                 if self.scheme is not None:
                     self.scheme.init()
@@ -214,38 +216,40 @@ class AppRuntime:
     # ── 每步回调（仿真线程） ─────────────────────────────────
 
     def _on_step(self, engine, step: int) -> None:
-        if self.scheme is not None:
-            with self._scheme_lock:      # 与 init/cleanup 串行，避免并发改方案内部状态
+        # 整步持锁：① 初始化未完成时阻塞（保证 collector/scheme 已就绪）；
+        # ② 与 Agent 工具调用串行，避免多线程同时使用同一个 TraCI 连接
+        with self._scheme_lock:
+            if self.scheme is not None:
                 self.scheme.on_step()
-        if self.safety_net is not None:
-            self.safety_net.on_step(step)
-        if self.arrival is not None:
-            self.arrival.decide(step)   # 峰期持续补车（在网软上限内）
-        self._track_test_vehicle()
-        data = self.collector.collect(step)
-        # 每步轻量平均速度：既推给前端实时显示，也入历史供底部栏曲线
-        #（overall 评价指标按 60 步粒度计算，若只靠它曲线会非常稀疏）
-        avg_spd = self.collector.avg_speed()
-        self.store.append(step, "avg_speed", avg_spd, "overall")
-        self.ws.queue_put({"type": "simulation_step", "data": {
-            "step": step,
-            "simulation_time": engine.get_sim_time(),
-            "vehicle_count": len(engine.get_vehicle_ids()),
-            "avg_speed": avg_spd,
-        }, "timestamp": step})
-        self.ws.queue_put({"type": "vehicle_update",
-                           "data": data["vehicles"], "timestamp": step})
-        if data["tls"]:
-            self.ws.queue_put({"type": "tls_update",
-                               "data": data["tls"], "timestamp": step})
-        if data["overall"] is not None:
-            emissions = self.collector.emissions()
-            self._record_metrics(step, data["overall"], data["intersections"],
-                                 emissions)
-            self.ws.queue_put({"type": "metrics_update",
-                               "data": {"overall": data["overall"],
-                                        "emissions": emissions},
-                               "timestamp": step})
+            if self.safety_net is not None:
+                self.safety_net.on_step(step)
+            if self.arrival is not None:
+                self.arrival.decide(step)   # 峰期持续补车（在网软上限内）
+            self._track_test_vehicle()
+            data = self.collector.collect(step)
+            # 每步轻量平均速度：既推给前端实时显示，也入历史供底部栏曲线
+            #（overall 评价指标按 60 步粒度计算，若只靠它曲线会非常稀疏）
+            avg_spd = self.collector.avg_speed()
+            self.store.append(step, "avg_speed", avg_spd, "overall")
+            self.ws.queue_put({"type": "simulation_step", "data": {
+                "step": step,
+                "simulation_time": engine.get_sim_time(),
+                "vehicle_count": len(engine.get_vehicle_ids()),
+                "avg_speed": avg_spd,
+            }, "timestamp": step})
+            self.ws.queue_put({"type": "vehicle_update",
+                               "data": data["vehicles"], "timestamp": step})
+            if data["tls"]:
+                self.ws.queue_put({"type": "tls_update",
+                                   "data": data["tls"], "timestamp": step})
+            if data["overall"] is not None:
+                emissions = self.collector.emissions()
+                self._record_metrics(step, data["overall"], data["intersections"],
+                                     emissions)
+                self.ws.queue_put({"type": "metrics_update",
+                                   "data": {"overall": data["overall"],
+                                            "emissions": emissions},
+                                   "timestamp": step})
 
     def _record_metrics(self, step: int, overall: dict, intersections: dict,
                         emissions: dict | None = None) -> None:

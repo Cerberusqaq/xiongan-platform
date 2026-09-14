@@ -135,6 +135,19 @@ def _safe_params(schema, args):
 
 
 def execute_tool(runtime, name: str, args: dict) -> dict:
+    """执行工具调用：与仿真线程串行（共用同一个 TraCI 连接，不能并发读）。
+
+    仿真进行中 Agent 查指标/调参同样会走 TraCI，与仿真线程的 step 并发会导致
+    响应错位；故统一用 runtime 的方案锁串行（RLock，可重入）。
+    """
+    lock = getattr(runtime, "_scheme_lock", None)
+    if lock is None:
+        return _execute_tool(runtime, name, args)
+    with lock:
+        return _execute_tool(runtime, name, args)
+
+
+def _execute_tool(runtime, name: str, args: dict) -> dict:
     """执行工具调用。返回 (ok, 结果文本) 结构化 dict，带安全护栏。"""
     schema = next((t for t in TOOL_SCHEMAS
                    if t["function"]["name"] == name), None)

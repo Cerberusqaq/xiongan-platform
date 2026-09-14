@@ -319,6 +319,21 @@ class Engine:
         except traci.TraCIException as exc:
             raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
 
+    def get_tls_phase_states(self, tls_id: str) -> list[str]:
+        """活动程序各相位的状态串列表（G/g/y/r 序列）。
+
+        Agent/方案侧解析绿灯阶段与过渡（黄灯）相位时统一走本接口，
+        避免各模块直接 import traci（不可单测、失败时静默退化）。
+        """
+        self._require_connected()
+        try:
+            logics = traci.trafficlight.getCompleteRedYellowGreenDefinition(tls_id)
+            active = traci.trafficlight.getProgram(tls_id)
+            logic = next((lg for lg in logics if lg.programID == active), logics[0])
+            return [str(ph.state) for ph in logic.phases]
+        except (traci.TraCIException, IndexError) as exc:
+            raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
+
     def get_tls_connections(self, tls_id: str) -> dict:
         """相位索引 -> 受控车道列表（简化映射，供 Webster 相位-edge 反查）。"""
         self._require_connected()

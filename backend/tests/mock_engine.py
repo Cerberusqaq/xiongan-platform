@@ -17,6 +17,7 @@ class MockEngine:
         self._restricted: dict[str, str] = {}      # edge_id -> reason
         self._edge_overrides: dict[str, dict] = {}  # edge_id -> 统计覆盖
         self._arrived_cumulative = 0
+        self._departed_cumulative = 0
         self._departed_buffer: list[str] = []
         self._arrived_buffer: list[str] = []
 
@@ -95,6 +96,10 @@ class MockEngine:
         self._require()
         return self._arrived_cumulative
 
+    def get_cumulative_departed(self):
+        self._require()
+        return self._departed_cumulative
+
     def get_edge_speed_limit(self, edge_id):
         self._require()
         return float(self._edges.get(edge_id, {}).get("speed_limit", 13.89))
@@ -135,6 +140,35 @@ class MockEngine:
         if t is None:
             raise EngineError(1002, f"信号灯不存在: {tls_id}")
         return {i: list(t["lanes"]) for i in range(t["num_phases"])}
+
+    def get_tls_phase_states(self, tls_id):
+        """活动程序相位状态串（与 add_tls 声明的相位一一对应）。"""
+        self._require()
+        t = self._tls.get(tls_id)
+        if t is None:
+            raise EngineError(1002, f"信号灯不存在: {tls_id}")
+        return list(t.get("phase_states") or ["G"] * t["num_phases"])
+
+    def get_tls_links(self, tls_id):
+        """受控 link 列表（与 state_str 同长同序，空槽占位）。"""
+        self._require()
+        t = self._tls.get(tls_id)
+        if t is None:
+            raise EngineError(1002, f"信号灯不存在: {tls_id}")
+        lanes = list(t.get("lanes") or [])
+        n = len(t["state_str"]) or t["num_phases"]
+        links = []
+        for i in range(n):
+            lane = lanes[i % len(lanes)] if lanes else ""
+            links.append({"from_edge": lane.rpartition("_")[0] if lane else "",
+                          "from_lane": 0, "dir": "s", "_slot": i})
+        return links
+
+    def get_edge_queue(self, edge_id):
+        """边内排队车辆数（测试近似：该边上速度低于停车阈值的车辆数）。"""
+        self._require()
+        return sum(1 for v in self._vehicles.values()
+                   if v["lane"] == edge_id and v["speed"] < 0.1)
 
     # ── Engine 契约：写入 ────────────────────────────────────
 
@@ -178,6 +212,16 @@ class MockEngine:
             raise EngineError(1002, f"边不存在: {edge_id}")
         self._edges[edge_id]["speed_limit"] = float(speed)
 
+    def add_vehicle_route(self, veh_id, route_edges, depart=0.0, veh_type=None):
+        """按边序列注入车辆（事件注入/人工加车用，与 Engine.add_vehicle_route 对齐）。"""
+        self._require()
+        route = list(route_edges or [])
+        if not route:
+            raise EngineError(1002, f"无法添加车辆 {veh_id}: 空路线")
+        self.add_vehicle(veh_id, veh_type=veh_type or "passenger",
+                         edges=route, speed=5.0)
+        return veh_id
+
     def add_vehicle_trip(self, veh_id, from_edge, to_edge, depart=0.0):
         self._require()
         if from_edge not in self._edges or to_edge not in self._edges:
@@ -208,6 +252,7 @@ class MockEngine:
             "emissions": {"fuel": 0.0, "co2": 0.0, "co": 0.0, "nox": 0.0},
         }
         self._departed_buffer.append(veh_id)
+        self._departed_cumulative += 1
         return self
 
     def get_vehicle_emissions(self, veh_id):

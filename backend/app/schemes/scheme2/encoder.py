@@ -55,46 +55,51 @@ class StateEncoder:
 
     # ── 结构构建 ────────────────────────────────────────────
 
+    def _phase_states(self, tid: str) -> list[str]:
+        """活动程序相位状态串：优先走 Engine 接口，取不到则回退 traci，最后空表。
+
+        统一走接口是为了可单测/可替换；解析失败时上层按"相位 0 视为唯一绿灯"降级。
+        """
+        fn = getattr(self.engine, "get_tls_phase_states", None)
+        if callable(fn):
+            try:
+                return [str(s) for s in fn(tid)]
+            except Exception:  # noqa: BLE001
+                return []
+        try:
+            import traci
+            logics = traci.trafficlight.getCompleteRedYellowGreenDefinition(tid)
+            active = traci.trafficlight.getProgram(tid)
+            logic = next((lg for lg in logics if lg.programID == active), logics[0])
+            return [str(ph.state) for ph in logic.phases]
+        except Exception:  # noqa: BLE001
+            return []
+
     def _build_green_phases(self) -> dict[str, list[int]]:
         """活动程序中所有含 G/g 的相位索引（= 可服务的绿灯阶段）。"""
-        import traci
         mapping: dict[str, list[int]] = {}
         for tid in self.tls_ids:
-            greens: list[int] = []
-            try:
-                logics = traci.trafficlight.getCompleteRedYellowGreenDefinition(tid)
-                active = traci.trafficlight.getProgram(tid)
-                logic = next((lg for lg in logics if lg.programID == active), logics[0])
-                greens = [i for i, ph in enumerate(logic.phases)
-                          if "G" in ph.state or "g" in ph.state]
-            except Exception:  # noqa: BLE001 失败回退：相位 0 视为唯一绿灯
-                greens = [0]
-            mapping[tid] = greens or [0]
+            states = self._phase_states(tid)
+            greens = [i for i, s in enumerate(states) if "G" in s or "g" in s]
+            mapping[tid] = greens or [0]   # 取不到程序时降级：相位 0 视为唯一绿灯
         return mapping
 
     def _build_transition_phases(self) -> dict[str, dict[int, int]]:
         """每个绿灯相位 -> 其后的过渡相位（含 y/Y 的黄灯清空相位）。
 
         不假设"下一相位必是黄灯"：从活动程序按状态字动态查找，
-        兼容任意符合 SUMO 标准的信号程序（含迟启绿等混合状态）。
+        兼容任意符合 SUMO 标准的程序（含迟启绿等混合状态）。
         """
-        import traci
         out: dict[str, dict[int, int]] = {}
         for tid in self.tls_ids:
+            states = self._phase_states(tid)
             m: dict[int, int] = {}
-            try:
-                logics = traci.trafficlight.getCompleteRedYellowGreenDefinition(tid)
-                active = traci.trafficlight.getProgram(tid)
-                logic = next((lg for lg in logics if lg.programID == active), logics[0])
-                phases = logic.phases
-                for g in self.green_phases.get(tid, []):
-                    t = g + 1
-                    while (t < len(phases) and "y" not in phases[t].state
-                           and "Y" not in phases[t].state):
-                        t += 1
-                    m[g] = t if t < len(phases) else g + 1
-            except Exception:  # noqa: BLE001 失败回退：下一相位
-                pass
+            for g in self.green_phases.get(tid, []):
+                t = g + 1
+                while (t < len(states) and "y" not in states[t]
+                       and "Y" not in states[t]):
+                    t += 1
+                m[g] = t if t < len(states) else g + 1
             out[tid] = m
         return out
 

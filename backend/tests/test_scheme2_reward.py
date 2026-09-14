@@ -10,6 +10,8 @@ def _reward(engine):
 
 def test_reward_switch_penalty_doubles_on_high_freq():
     r = _reward(None)
+    # 默认 switch_penalty=0（该职责已由 hold_waste 承担），此处显式打开以验证倍罚机制
+    r.w["switch_penalty"] = 1.0
     base = {"avg_delay": 10, "avg_queue": 2, "avg_speed": 5}
     low = r.compute("T1", [0.0] * 22, base, True, 3)
     high = r.compute("T1", [0.0] * 22, base, True, 8)
