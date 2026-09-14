@@ -740,15 +740,24 @@ class Engine:
             raise EngineError(1002, f"车辆不存在: {veh_id}") from exc
 
     def mark_vehicle(self, veh_id: str, color=None, shape: str | None = None) -> None:
-        """设置车辆外观（测试车高亮用）；车辆已消失时静默忽略。"""
+        """设置车辆外观（测试车高亮用）；车辆已消失/接口不存在时静默忽略。
+
+        注意：不同 SUMO 版本的 TraCI 车辆域方法不一致（如 setShape 在 1.27 不存在），
+        故这里按需探测方法存在性，且任何失败都不得影响主流程。
+        """
         self._require_connected()
-        try:
-            if color:
+        if color:
+            try:
                 traci.vehicle.setColor(veh_id, color)
-            if shape:
-                traci.vehicle.setShape(veh_id, shape)
-        except traci.TraCIException:
-            pass
+            except Exception:  # noqa: BLE001
+                pass
+        if shape:
+            setter = getattr(traci.vehicle, "setShape", None)
+            if callable(setter):
+                try:
+                    setter(veh_id, shape)
+                except Exception:  # noqa: BLE001
+                    pass
 
     def set_edge_speed_limit(self, edge_id: str, speed: float) -> None:
         """运行时调整某条边所有车道的限速（用于施工/事故扰动）。"""
