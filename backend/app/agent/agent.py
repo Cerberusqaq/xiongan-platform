@@ -197,12 +197,31 @@ def run_agent(runtime, user_input: str, max_steps: int = MAX_STEPS):
     log = []
     last_action = None
     repeat_count = 0
+    nudged = False          # 只纠偏一次，避免死循环
+
+    def _wrote_ok() -> bool:
+        return any((c.get("result") or {}).get("ok") and c.get("tool") in WRITE_TOOLS
+                   for c in log)
+
     try:
         for _ in range(max_steps):
             resp = _create(messages)
             text = (resp.choices[0].message.content or "").strip()
             action = _parse_action(text)
             if action is None:
+                # 用户要的是"执行"，但整轮没有任何写操作落地 → 确定性纠偏一次，
+                # 避免模型只查一通却直接声称已完成（实测出现过）
+                if (not nudged and any(k in user_input for k in _WRITE_INTENT)
+                        and not _wrote_ok()):
+                    nudged = True
+                    messages.append({"role": "assistant", "content": text})
+                    messages.append({
+                        "role": "user",
+                        "content": "注意：用户要求的是**执行操作**，但你目前还没有成功调用任何"
+                                   "写操作工具。请立即只输出一个写操作的工具 JSON"
+                                   "（configure_algorithm / switch_scheme / inject_event / "
+                                   "set_right_turn_green / algorithm_action），不要再输出说明文字。"})
+                    continue
                 return _with_caveats(text or "（模型未返回内容）", log, user_input), log
             # 连续重复同一动作视为无进展，强制终止并要求总结
             if action == last_action:
