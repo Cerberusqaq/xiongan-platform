@@ -56,22 +56,15 @@ class StateEncoder:
     # ── 结构构建 ────────────────────────────────────────────
 
     def _phase_states(self, tid: str) -> list[str]:
-        """活动程序相位状态串：优先走 Engine 接口，取不到则回退 traci，最后空表。
+        """活动程序相位状态串：统一走 Engine 接口（内部已串行化）。
 
-        统一走接口是为了可单测/可替换；解析失败时上层按"相位 0 视为唯一绿灯"降级。
+        取不到时返回空表，上层按"相位 0 视为唯一绿灯"降级。
         """
         fn = getattr(self.engine, "get_tls_phase_states", None)
-        if callable(fn):
-            try:
-                return [str(s) for s in fn(tid)]
-            except Exception:  # noqa: BLE001
-                return []
+        if not callable(fn):
+            return []
         try:
-            import traci
-            logics = traci.trafficlight.getCompleteRedYellowGreenDefinition(tid)
-            active = traci.trafficlight.getProgram(tid)
-            logic = next((lg for lg in logics if lg.programID == active), logics[0])
-            return [str(ph.state) for ph in logic.phases]
+            return [str(s) for s in fn(tid)]
         except Exception:  # noqa: BLE001
             return []
 

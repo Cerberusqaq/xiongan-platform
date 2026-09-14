@@ -1,6 +1,8 @@
 """TraCI 引擎适配器：封装 SUMO 读写接口，全部模块共用此契约。"""
 
+import functools
 import os
+import threading
 
 import traci
 
@@ -18,6 +20,8 @@ class Engine:
     """对 SUMO/TraCI 的薄封装，方法签名即全项目共享契约。"""
 
     def __init__(self):
+        # TraCI 只有一个全局连接：仿真线程 step 与 API/Agent 线程的查询必须串行
+        self._lock = threading.RLock()
         self._connected = False
         self._step = 0
         self._net_file = ""
@@ -567,6 +571,22 @@ class Engine:
         except traci.TraCIException as exc:
             raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
 
+    def set_tls_state_str(self, tls_id: str, state_str: str) -> None:
+        """直接覆写信号灯当前状态串（安全网防溢出用；不改程序定义）。"""
+        self._require_connected()
+        try:
+            traci.trafficlight.setRedYellowGreenState(tls_id, state_str)
+        except traci.TraCIException as exc:
+            raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
+
+    def get_tls_link_tuples(self, tls_id: str) -> list:
+        """受控连接的原始元组列表（逐槽位，与 state_str 字符一一对应）。"""
+        self._require_connected()
+        try:
+            return list(traci.trafficlight.getControlledLinks(tls_id))
+        except traci.TraCIException as exc:
+            raise EngineError(1002, f"信号灯不存在: {tls_id}") from exc
+
     def set_tls_program(self, tls_id: str, program_id: str) -> None:
         self._require_connected()
         try:
@@ -719,6 +739,17 @@ class Engine:
         except traci.TraCIException as exc:
             raise EngineError(1002, f"车辆不存在: {veh_id}") from exc
 
+    def mark_vehicle(self, veh_id: str, color=None, shape: str | None = None) -> None:
+        """设置车辆外观（测试车高亮用）；车辆已消失时静默忽略。"""
+        self._require_connected()
+        try:
+            if color:
+                traci.vehicle.setColor(veh_id, color)
+            if shape:
+                traci.vehicle.setShape(veh_id, shape)
+        except traci.TraCIException:
+            pass
+
     def set_edge_speed_limit(self, edge_id: str, speed: float) -> None:
         """运行时调整某条边所有车道的限速（用于施工/事故扰动）。"""
         self._require_connected()
@@ -768,3 +799,25 @@ class Engine:
     def _require_connected(self) -> None:
         if not self._connected:
             raise EngineError(1001, "仿真引擎未连接")
+
+
+# ── 全局串行化 ──────────────────────────────────────────────
+# TraCI 客户端是进程级单连接：多线程同时读写会导致响应错位/挂起。
+# 这里给 Engine 的全部公开方法统一加锁（RLock，可重入），
+# 使"仿真线程 step"与"API/Agent 线程查询"天然互斥，各调用方无需再关心并发。
+
+def _serialized(fn):
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return fn(self, *args, **kwargs)
+    return wrapper
+
+
+for _name, _member in list(vars(Engine).items()):
+    if _name.startswith("_") or not callable(_member):
+        continue
+    if isinstance(_member, (staticmethod, classmethod, property)):
+        continue
+    setattr(Engine, _name, _serialized(_member))
+del _name, _member

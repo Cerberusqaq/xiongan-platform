@@ -170,6 +170,29 @@ class MockEngine:
         return sum(1 for v in self._vehicles.values()
                    if v["lane"] == edge_id and v["speed"] < 0.1)
 
+    def get_tls_link_tuples(self, tls_id):
+        """受控连接原始元组（占位实现：与 state_str 槽位对齐）。"""
+        self._require()
+        if tls_id not in self._tls:
+            raise EngineError(1002, f"信号灯不存在: {tls_id}")
+        return [((f"E{i}_0", 0), (f"E{i}_0", 0)) for i in range(1, 4)]
+
+    def set_tls_state_str(self, tls_id, state_str):
+        """直接覆写状态串（安全网用）。"""
+        self._require()
+        t = self._tls.get(tls_id)
+        if t is None:
+            raise EngineError(1002, f"信号灯不存在: {tls_id}")
+        t["state_str"] = state_str
+
+    def mark_vehicle(self, veh_id, color=None, shape=None):
+        """设置车辆外观（测试车高亮用）。"""
+        self._require()
+        v = self._vehicles.get(veh_id)
+        if v is not None:
+            v["color"] = color
+            v["shape"] = shape
+
     # ── Engine 契约：写入 ────────────────────────────────────
 
     def set_tls_phase(self, tls_id, phase_index, duration):

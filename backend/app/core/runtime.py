@@ -503,13 +503,9 @@ class AppRuntime:
         step = self.session.status().get("step", 0)
         vid = f"test_{self.session.status().get('step', 0)}_{len(route)}"
         self.session.engine.add_vehicle_route(vid, route, depart=float(step))
-        # 特殊标记：白色醒目
-        try:
-            import traci
-            traci.vehicle.setColor(vid, (255, 255, 255, 255))
-            traci.vehicle.setShape(vid, "passenger")
-        except Exception:  # noqa: BLE001
-            pass
+        # 特殊标记：白色醒目（走 Engine 接口，保证与仿真线程串行）
+        self.session.engine.mark_vehicle(vid, color=(255, 255, 255, 255),
+                                        shape="passenger")
         self.test_vehicle = {
             "vid": vid, "route": route, "step_added": step,
             "prev_wait": 0.0, "total_wait": 0.0, "max_wait": 0.0,

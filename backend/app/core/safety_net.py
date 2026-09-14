@@ -64,7 +64,6 @@ class SafetyNet:
     def on_step(self, step: int) -> None:
         if not self._enabled:
             return
-        import traci
         try:
             self._load_links()
             for tid in self._engine.get_tls_ids():
@@ -79,7 +78,7 @@ class SafetyNet:
                                                  links, step)
                 if new_state is not None and new_state != st["state_str"]:
                     try:
-                        traci.trafficlight.setRedYellowGreenState(tid, new_state)
+                        self._engine.set_tls_state_str(tid, new_state)
                         self._stats["overrides"] += 1
                     except Exception:  # noqa: BLE001
                         continue

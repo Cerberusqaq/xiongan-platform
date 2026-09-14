@@ -46,7 +46,6 @@ def build_phase_serving(engine):
     返回 {tls_id: {phase_index: [(src_edge, dst_edge), ...]}}（仅绿色相位）。
     需引擎已连接，且可从 net_file 加载 sumolib 网络。
     """
-    import traci
     import sumolib
 
     net_file = engine.net_file()
@@ -58,7 +57,8 @@ def build_phase_serving(engine):
         jcoord = node_coords.get(tls_id)
         if jcoord is None:
             continue
-        links = traci.trafficlight.getControlledLinks(tls_id)
+        # 走 Engine 接口（内部已串行化），避免直接使用 traci 与仿真线程并发
+        links = engine.get_tls_link_tuples(tls_id)
         # 收集每个 link 的 (全局槽位序, 上游边, 下游边)。
         # 关键：TraCI getControlledLinks 顺序 = state 字符序，且部分路口存在
         # **空槽**（受控序号缺号但仍占一个字符位，如 0,1,3,4… 缺 2）。
@@ -91,19 +91,17 @@ def build_phase_serving(engine):
 
         # 相位 → 该相位放行的 link（按 state 判断 G/g）
         try:
-            logics = traci.trafficlight.getCompleteRedYellowGreenDefinition(tls_id)
-        except traci.TraCIException:
+            states = engine.get_tls_phase_states(tls_id)
+        except Exception:  # noqa: BLE001 取不到程序则跳过该路口
             continue
-        active = traci.trafficlight.getProgram(tls_id)
-        logic = next((lg for lg in logics if lg.programID == active), logics[0])
         by_phase = {}
-        for pi, ph in enumerate(logic.phases):
-            if not ("G" in ph.state or "g" in ph.state):
+        for pi, state in enumerate(states):
+            if not ("G" in state or "g" in state):
                 continue
             # 该相位放行的 link：state[全局槽位] 为 G/g
             served = []
             for slot, _, src, dst in link_meta:
-                if slot < len(ph.state) and ph.state[slot] in "Gg":
+                if slot < len(state) and state[slot] in "Gg":
                     served.append((src, dst))
             if served:
                 # 去重：同一 (上游,下游) 可能被多股车道覆盖，避免压力重复计数

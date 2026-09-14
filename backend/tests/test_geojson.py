@@ -4,9 +4,9 @@ import pytest
 
 from app.core.geojson import export_geojson, network_summary
 
-# 复用项目真实路网（20 路口雄安网络）
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-NET_PATH = os.path.join(REPO_ROOT, "network", "base_network.net.xml")
+# 复用项目真实路网（20 路口雄安网络）：tests/ → backend/ → 仓库根
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+NET_PATH = os.path.join(REPO_ROOT, "networks", "network", "base_network.net.xml")
 
 
 @pytest.mark.skipif(not os.path.exists(NET_PATH), reason="缺少真实路网文件")
