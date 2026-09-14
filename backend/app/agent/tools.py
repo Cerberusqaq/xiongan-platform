@@ -65,6 +65,13 @@ TOOL_SCHEMAS = [
                                                "enum": ["mappo", "scoot", "auto"]}},
                        "required": ["mode"]}}},
     {"type": "function", "function": {
+        "name": "set_right_turn_green",
+        "description": "开启/关闭右转常绿（路口信号程序级开关，仿真运行中即时生效、关闭时自动还原原程序）。注意：这不是算法参数，不能用 configure_algorithm 设置",
+        "parameters": {"type": "object",
+                       "properties": {"enabled": {"type": "boolean",
+                                                  "description": "true=开启右转常绿，false=关闭并还原"}},
+                       "required": ["enabled"]}}},
+    {"type": "function", "function": {
         "name": "generate_report",
         "description": "汇总当前全局指标生成简要态势报告（Markdown）",
         "parameters": {"type": "object", "properties": {}, "required": []}}},
@@ -229,6 +236,22 @@ def _execute_tool(runtime, name: str, args: dict) -> dict:
             if action is None:
                 return {"ok": False, "message": "mode 需为 mappo / scoot / auto"}
             return runtime.scheme.handle_action(action, {})
+        if name == "set_right_turn_green":
+            # 右转常绿是"信号程序级开关"（REST: /simulate/right-turn-green），
+            # 不属于任何算法的 ParamSpec，故单独成工具（原来 Agent 无工具可用，
+            # 只能瞎猜 configure_algorithm 的参数名而失败）
+            if runtime.session is None:
+                return {"ok": False, "message": "仿真未启动，无法设置右转常绿"}
+            raw = args.get("enabled", True)
+            if isinstance(raw, str):
+                enabled = raw.strip().lower() not in ("false", "0", "no", "off", "关闭")
+            else:
+                enabled = bool(raw)
+            res = runtime.set_right_turn_green(enabled)
+            if not res.get("ok"):
+                return {"ok": False, "message": "仿真未启动，无法设置右转常绿"}
+            return {"ok": True, "data": {"right_turn_green": enabled},
+                    "message": "已开启右转常绿" if enabled else "已关闭右转常绿并还原原程序"}
         if name == "generate_report":
             m = runtime.realtime_metrics().get("overall", {})
             st = runtime.status()

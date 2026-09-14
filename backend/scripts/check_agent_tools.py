@@ -100,6 +100,8 @@ def main():
     call("get_region_status", {"edges": edges[:10]}, note="(指定边)")
     call("list_events", {})
     call("inject_event", {"event_type": "construction", "edge_ids": edges[:2]})
+    call("set_right_turn_green", {"enabled": True})
+    call("set_right_turn_green", {"enabled": False})
     call("list_events", {}, note="(注入后)")
     call("plan_route", {"from_edge": frm, "to_edge": to})
     call("plan_route", {"start": frm, "end": to}, note="(别名参数)")
