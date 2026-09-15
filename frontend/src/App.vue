@@ -8,6 +8,7 @@ import SchemePanel from './components/SchemePanel.vue'
 import EventPanel from './components/EventPanel.vue'
 import CompareSection from './components/CompareSection.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import LoadingOverlay from './components/LoadingOverlay.vue'
 import { useUiStore } from './stores/ui'
 import { useSimStore } from './stores/sim'
 import { useAgentStore } from './stores/agent'
@@ -20,6 +21,28 @@ const agent = useAgentStore()
 const metrics = useMetricsStore()
 
 const settingsOpen = ref(false)
+
+// ── 加载中提示（屏幕中央小窗）：启动仿真期间 + 启动后等首批数据期间 ──
+// 后端启动含"生成车流 + 无头预热 90 仿真秒"，需要数秒；此间画面是空的，
+// 给评委一个明确的加载反馈（不挡操作：后端卡住时仍可手动启动/切换）。
+const loadingInfo = computed(() => {
+  if (sim.starting) {
+    return { title: '正在加载仿真…', hint: '正在加载路网、生成车流并预热，请稍候' }
+  }
+  if (sim.waitingFrame && sim.status === 'running') {
+    return { title: '正在加载交通流…', hint: '正在接收车辆与信号灯数据，画面即将呈现' }
+  }
+  return null
+})
+let loadingTimer = null
+watch(loadingInfo, (v) => {
+  clearTimeout(loadingTimer)
+  if (!v) return
+  // 兜底：万一首批数据没到（WS 断/后端异常），20s 后自动撤下，避免一直挡着
+  if (sim.waitingFrame) {
+    loadingTimer = setTimeout(() => { sim.waitingFrame = false }, 20000)
+  }
+})
 
 // ── 响应式断点：窄屏把侧栏从"固定占宽"切换为"悬浮抽屉"，给画布让出整屏 ──
 const compact = ref(false)   // ≤1100px：右栏（AI 助手）变抽屉
@@ -116,6 +139,7 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   timers.forEach(clearInterval)
+  clearTimeout(loadingTimer)
   window.removeEventListener('resize', onResize)
 })
 
@@ -265,6 +289,9 @@ watch(() => ui.settings.rightTurnGreen, (on) => {
     </template>
 
     <SettingsPanel :open="settingsOpen" @close="settingsOpen = false" />
+
+    <!-- 加载中：屏幕中央小窗 -->
+    <LoadingOverlay v-if="loadingInfo" :title="loadingInfo.title" :hint="loadingInfo.hint" />
   </div>
 </template>
 

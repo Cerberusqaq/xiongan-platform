@@ -54,6 +54,10 @@ XH-202613 竞赛赛道 C（AI 应用型）：以 **SUMO 微观交通仿真**为�
 ### 4.1 一键启动
 双击 `start.bat`：自动检查/安装 Python 依赖（清华镜像）→ 检查/安装前端依赖 → 起后端(8000)与前端(5173) → 打开浏览器。
 
+> **打包交付注意**：不要把 `backend\.venv` 打进压缩包。venv 里记录的是**创建者机器的绝对路径**
+> （`pyvenv.cfg` 的 `home`、`Scripts\pip.exe`），换台机器无法复用；`start.bat` 已会自动检测并在
+> 本机重建，但白带几百 MB 且首次启动更慢。`frontend\node_modules` 可以随包（缺失会自动 `npm install`）。
+
 ### 4.2 手动启动
 ```bat
 cd backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000

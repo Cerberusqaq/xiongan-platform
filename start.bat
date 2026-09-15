@@ -10,6 +10,7 @@ if not exist "%BE%\requirements.txt" (
     exit /b 1
 )
 
+rem ---- SUMO -------------------------------------------------
 if not exist "%SUMO_HOME%\bin\sumo.exe" (
     if exist "C:\Program Files (x86)\Eclipse\Sumo\bin\sumo.exe" set "SUMO_HOME=C:\Program Files (x86)\Eclipse\Sumo"
 )
@@ -33,16 +34,46 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "%BE%\.venv\Scripts\python.exe" (
+rem ---- Python environment -----------------------------------
+rem A .venv created on another machine stores THAT machine's absolute paths
+rem (pyvenv.cfg "home", Scripts\pip.exe). If this folder was copied/downloaded,
+rem the bundled env cannot run here -> verify functionally, then rebuild.
+set "VENV=%BE%\.venv"
+set "VENV_PY=%VENV%\Scripts\python.exe"
+set "VENV_REBUILT="
+
+if exist "%VENV_PY%" (
+    "%VENV_PY%" -c "import sys" >nul 2>nul
+    if errorlevel 1 (
+        echo [1/4] Existing Python env is not usable on this machine ^(bundled from elsewhere^).
+        echo       Rebuilding "%VENV%" ...
+        rmdir /s /q "%VENV%" 2>nul
+        set "VENV_REBUILT=1"
+    )
+)
+if exist "%VENV_PY%" if defined VENV_REBUILT (
+    echo [ERROR] Could not remove "%VENV%". Close any program using it, then run again.
+    pause
+    exit /b 1
+)
+if not exist "%VENV_PY%" (
     echo [1/4] Creating the backend Python environment...
-    python -m venv --system-site-packages "%BE%\.venv"
+    python -m venv --system-site-packages "%VENV%"
     if errorlevel 1 (
         echo [ERROR] Could not create the Python environment.
         pause
         exit /b 1
     )
+    set "VENV_REBUILT=1"
 )
-set "PATH=%BE%\.venv\Scripts;%PATH%"
+set "PATH=%VENV%\Scripts;%PATH%"
+"%VENV_PY%" -c "import sys" >nul 2>nul
+if errorlevel 1 (
+    echo [ERROR] The Python environment is broken. Delete "%VENV%" and run start.bat again.
+    pause
+    exit /b 1
+)
+
 echo [1/4] Checking backend dependencies...
 python -m pip install -r "%BE%\requirements.txt"
 if errorlevel 1 (
@@ -77,6 +108,12 @@ if not exist "%FE%\node_modules\vite\bin\vite.js" (
         exit /b 1
     )
     popd
+)
+rem Vite's dep cache is keyed to absolute paths: clear it after the folder moved
+rem (first run on this machine) so the dev server re-optimizes instead of failing.
+if defined VENV_REBUILT if exist "%FE%\node_modules\.vite" (
+    echo       Clearing stale frontend build cache...
+    rmdir /s /q "%FE%\node_modules\.vite" 2>nul
 )
 
 echo [3/4] Starting backend on port 8000...

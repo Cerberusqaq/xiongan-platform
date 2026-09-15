@@ -11,7 +11,8 @@ export const useSimStore = defineStore('sim', {
     scheme: null,            // 后端实际活动方案（refreshStatus 轮询/动作后刷新）
     schemeMode: '',          // 活动方案控制器模式（scheme_2: mappo/scoot/auto），Agent/面板切换后即时可见
     speed: 1,
-    starting: false,         // 启动请求进行中
+    starting: false,         // 启动请求进行中（后端建网+预热，可能数秒到十几秒）
+    waitingFrame: false,     // 已启动但还没收到首批步进数据（画布尚无内容）
     nets: [],                // GET /networks 列表 [{name, net_path, routes[], adds[]}]
     lastNetPath: null,
     currentEdges: [],        // 当前加载路网的边 id 列表（画布解析后写入，供 Agent/事件用）
@@ -57,6 +58,8 @@ export const useSimStore = defineStore('sim', {
         this.scheme = st.scheme || scheme
         this.schemeMode = st.scheme_mode || ''
         this.status = 'running'
+        this.step = 0
+        this.waitingFrame = true   // 等首批 simulation_step 到达（画布才有内容）
         return d
       } finally {
         this.starting = false
@@ -66,6 +69,7 @@ export const useSimStore = defineStore('sim', {
       await apiPost('/simulate/stop', {})
       this.status = 'idle'
       this.sessionId = null
+      this.waitingFrame = false
     },
     async pause() { await apiPost('/simulate/pause', {}) },
     async resume() { await apiPost('/simulate/resume', {}) },
@@ -80,7 +84,10 @@ export const useSimStore = defineStore('sim', {
     },
     applyStep(data) {
       if (!data) return
-      if (typeof data.step === 'number') this.step = data.step
+      if (typeof data.step === 'number') {
+        this.step = data.step
+        if (data.step > 0) this.waitingFrame = false   // 首批数据已到，撤下加载窗
+      }
       if (typeof data.simulation_time === 'number') this.simTime = data.simulation_time
     },
   },
