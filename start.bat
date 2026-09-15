@@ -1,5 +1,6 @@
 @echo off
 setlocal EnableExtensions
+title LingDong Traffic Platform - services (backend + frontend)
 set "ROOT=%~dp0"
 set "BE=%ROOT%backend"
 set "FE=%ROOT%frontend"
@@ -116,18 +117,21 @@ if defined VENV_REBUILT if exist "%FE%\node_modules\.vite" (
     rmdir /s /q "%FE%\node_modules\.vite" 2>nul
 )
 
-echo [3/4] Starting backend on port 8000...
-start "traffic-backend" /D "%BE%" cmd /k "python -m uvicorn app.main:app --host 127.0.0.1 --port 8000"
-powershell -NoProfile -Command "$ok=$false; for($i=0;$i -lt 30;$i++){try{$r=Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/v1/simulate/status' -TimeoutSec 2; if($r.code -eq 0){$ok=$true;break}}catch{}; Start-Sleep -Seconds 1}; if(-not $ok){exit 1}"
+rem Backend + frontend run in THIS window, supervised by run_services.ps1
+rem (not cmd "start /b": it can silently fail to spawn children when stdout is
+rem  redirected or the console is non-interactive)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0run_services.ps1" -Backend "%BE%" -Frontend "%FE%"
 if errorlevel 1 (
-    echo [ERROR] Backend did not become ready. Check the traffic-backend window.
+    echo.
+    echo [ERROR] Could not start the services. See the messages above.
+    echo         Manual fallback ^(two windows^):
+    echo           cd /d "%BE%" ^&^& python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+    echo           cd /d "%FE%" ^&^& npm run dev
     pause
     exit /b 1
 )
 
-echo [4/4] Starting frontend on port 5173...
-start "traffic-frontend" /D "%FE%" cmd /k "npm run dev"
-timeout /t 4 /nobreak >nul
-start "" "http://localhost:5173"
-echo Ready. Keep both service windows open during the demo.
-pause
+echo.
+echo All services have stopped. Press any key to close this window.
+pause >nul
+
