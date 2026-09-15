@@ -18,7 +18,8 @@ param(
     [int]$BackendPort = 8000,
     [int]$FrontendPort = 5173,
     [switch]$NoBrowser,
-    [int]$ReadyTimeoutSec = 60
+    [int]$ReadyTimeoutSec = 60,
+    [int]$FrontendTimeoutSec = 90
 )
 
 $ErrorActionPreference = 'Stop'
@@ -75,13 +76,41 @@ Say "  Close this window (or press Ctrl+C) to stop ALL services."
 Say "============================================================"
 Say ""
 
-if (-not $NoBrowser) { Start-Process "http://localhost:$FrontendPort" | Out-Null }
-
 Say "[4/4] Starting frontend on port $FrontendPort (logs below)..."
 # npm is npm.cmd on Windows (a batch file) which CreateProcess cannot run
 # directly, so launch it explicitly through cmd.exe.
 $fe = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'npm run dev' `
     -WorkingDirectory $Frontend -NoNewWindow -PassThru
+
+# IMPORTANT: wait until the dev server actually answers BEFORE opening the
+# browser - otherwise the tab opens too early and shows "can't reach this page"
+# (the first Vite request also pre-bundles dependencies, so it can take a while).
+$feReady = $false
+for ($i = 0; $i -lt $FrontendTimeoutSec; $i++) {
+    $feAlive = $true
+    try { $feAlive = -not $fe.HasExited } catch { $feAlive = $false }
+    if (-not $feAlive) { break }
+    try {
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$FrontendPort" -TimeoutSec 2 -UseBasicParsing
+        if ($resp.StatusCode -eq 200) { $feReady = $true; break }
+    } catch { }
+    Start-Sleep -Seconds 1
+}
+
+if ($feReady) {
+    Say "  Frontend is ready: http://localhost:$FrontendPort"
+    Say "  Opening the browser now..."
+    if (-not $NoBrowser) { Start-Process "http://localhost:$FrontendPort" | Out-Null }
+} else {
+    $feAlive = $true
+    try { $feAlive = -not $fe.HasExited } catch { $feAlive = $false }
+    if (-not $feAlive) {
+        Say "[ERROR] Frontend exited early - see the npm output above."
+    } else {
+        Say "[ERROR] Frontend did not answer on port $FrontendPort within $FrontendTimeoutSec s."
+        Say "        The dev server may still be starting; open http://localhost:$FrontendPort manually."
+    }
+}
 
 # Keep the window alive; closing it / Ctrl+C takes both services down.
 Wait-Process -Id $be.Id, $fe.Id -ErrorAction SilentlyContinue
