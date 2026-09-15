@@ -22,9 +22,25 @@ const metrics = useMetricsStore()
 
 const settingsOpen = ref(false)
 
-// ── 加载中提示（屏幕中央小窗）：启动仿真期间 + 启动后等首批数据期间 ──
-// 后端启动含"生成车流 + 无头预热 90 仿真秒"，需要数秒；此间画面是空的，
-// 给评委一个明确的加载反馈（不挡操作：后端卡住时仍可手动启动/切换）。
+// ── 加载中提示（屏幕中央小窗） ──
+// 覆盖三个阶段：① 页面初始化（停掉残留会话 / 拉路网，之前完全没有提示）；
+// ② 启动仿真（后端生成车流 + 无头预热，云端也可能只需不到 1 秒）；
+// ③ 启动后等首批步进数据。并保证**最小显示时长**，避免云端启动太快时"一闪而过"
+// 导致根本看不到。不挡操作：后端异常时仍可手动启动/切换方案。
+const MIN_SHOW_MS = 1400      // 最小可见时长（防闪烁）
+const MAX_SHOW_MS = 90000     // 兜底：超过则强制撤下，避免后端不可用时一直挡着
+const loadingHold = ref(false)
+const lastInfo = ref(null)    // hold 期间沿用最后一次文案，避免标题退化成"正在加载…"
+// 页面级"准备中"：从挂载起，直到**本次**启动的会话真正出数据为止。
+//（不能用"是否收到过步进"来判断：打开页面时后端常残留旧会话，
+//  它的 WS 步进会立刻满足条件，导致"停旧会话→重新启动"的空档没有提示）
+const preparing = ref(true)
+// 本次页面发起的启动请求是否已返回：只有它返回后才允许结束"准备中"。
+//（不能只看 step>0——打开页面时后端残留的旧会话同样在推进步数）
+const startReturned = ref(false)
+let loadingHoldTimer = null
+let loadingCapTimer = null
+
 const loadingInfo = computed(() => {
   if (sim.starting) {
     return { title: '正在加载仿真…', hint: '正在加载路网、生成车流并预热，请稍候' }
@@ -32,15 +48,36 @@ const loadingInfo = computed(() => {
   if (sim.waitingFrame && sim.status === 'running') {
     return { title: '正在加载交通流…', hint: '正在接收车辆与信号灯数据，画面即将呈现' }
   }
+  if (preparing.value) {
+    return { title: '正在准备平台…', hint: '正在初始化仿真会话与路网数据' }
+  }
   return null
 })
-let loadingTimer = null
+const overlayInfo = computed(() => loadingInfo.value
+  || (loadingHold.value ? lastInfo.value : null))
+const showLoading = computed(() => !!overlayInfo.value)
+
+// 本次启动返回、且已有步进数据 → 结束准备阶段
+watch([() => sim.step, () => sim.starting], () => {
+  if (preparing.value && startReturned.value && !sim.starting && sim.step > 0) {
+    preparing.value = false
+  }
+}, { immediate: true })
+
 watch(loadingInfo, (v) => {
-  clearTimeout(loadingTimer)
+  // 变成 null 时不动作：交给下面已排定的 MIN_SHOW_MS 定时器到点释放
+  //（若在这里 clearTimeout，hold 会永远为真、遮罩再也收不掉）
   if (!v) return
-  // 兜底：万一首批数据没到（WS 断/后端异常），20s 后自动撤下，避免一直挡着
-  if (sim.waitingFrame) {
-    loadingTimer = setTimeout(() => { sim.waitingFrame = false }, 20000)
+  lastInfo.value = v
+  loadingHold.value = true
+  clearTimeout(loadingHoldTimer)
+  loadingHoldTimer = setTimeout(() => { loadingHold.value = false }, MIN_SHOW_MS)
+  if (!loadingCapTimer) {
+    loadingCapTimer = setTimeout(() => {
+      preparing.value = false     // 兜底：后端不可用时不要一直转圈
+      sim.waitingFrame = false
+      loadingHold.value = false
+    }, MAX_SHOW_MS)
   }
 })
 
@@ -104,9 +141,11 @@ async function autoStartDefault() {
       schemeParams: { mode: 'auto', decision_step: 60 },
       scenario: 'normal',          // 默认平峰车流（渐入需手动选择）
     })
+    startReturned.value = true     // 本次启动已返回：此后收到步进即视为就绪
     sim.setSpeed(5).catch(() => {})
   } catch (e) {
     console.warn('[auto-start] 失败（可手动启动）:', e.message)
+    startReturned.value = true     // 失败也不要一直转圈，交给 90s 兜底/用户手动
     autoStarted = false
   }
 }
@@ -139,7 +178,8 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   timers.forEach(clearInterval)
-  clearTimeout(loadingTimer)
+  clearTimeout(loadingHoldTimer)
+  clearTimeout(loadingCapTimer)
   window.removeEventListener('resize', onResize)
 })
 
@@ -202,9 +242,14 @@ function handleStart({ net, routes, addFiles, scheme, scenario }) {
     schemeParams,
     rightTurnGreen: !!ui.settings.rightTurnGreen,
     scenario: scenario ?? 'normal',   // 默认平峰车流（'' 渐入由用户显式选择）
-  }).catch((e) => console.warn('[start] 启动失败:', e.message))
+  }).then(() => { startReturned.value = true })
+    .catch((e) => { startReturned.value = true; console.warn('[start] 启动失败:', e.message) })
 }
-function handleStop() { sim.stop().then(() => metrics.resetSession()).catch(() => {}) }
+function handleStop() {
+  // 用户主动停止：视为已就绪，收掉加载提示（挂载时的自动停止不走这里）
+  preparing.value = false
+  sim.stop().then(() => metrics.resetSession()).catch(() => {})
+}
 function handlePause() { sim.pause().catch(() => {}) }
 function handleResume() { sim.resume().catch(() => {}) }
 function handleSpeed(v) { sim.setSpeed(v).catch(() => {}) }
@@ -291,7 +336,7 @@ watch(() => ui.settings.rightTurnGreen, (on) => {
     <SettingsPanel :open="settingsOpen" @close="settingsOpen = false" />
 
     <!-- 加载中：屏幕中央小窗 -->
-    <LoadingOverlay v-if="loadingInfo" :title="loadingInfo.title" :hint="loadingInfo.hint" />
+    <LoadingOverlay v-if="showLoading" :title="overlayInfo.title" :hint="overlayInfo.hint" />
   </div>
 </template>
 
